@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard & QR Hub — MenuScan</title>
+  <meta name="description" content="Centralized administration panel for restaurants, menu items, live kitchen orders, and high-resolution table QR codes.">
+  <link rel="stylesheet" href="css/admin.css">
+  <!-- CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div id="admin-toast" class="admin-toast"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       1. SECURE ADMIN LOGIN SCREEN (When not logged in)
+       ═══════════════════════════════════════════════ -->
+  <div id="admin-login-screen" class="login-container">
+    <div class="login-card">
+      <div class="login-logo-icon">🔐</div>
+      <h1 class="login-title">Platform Admin Login</h1>
+      <p class="login-sub">Authorized administrator & restaurant owner access to manage menus, analytics & QR codes</p>
+
+      <form id="admin-login-form" onsubmit="event.preventDefault(); handleAdminLogin();">
+        <div class="form-group">
+          <label for="login-email">Account Email / ID</label>
+          <input type="text" id="login-email" placeholder="admin@menuscan.com or owner1@menuscan.com" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+
+        <div id="login-error" class="login-error-box"></div>
+
+        <button type="submit" class="login-btn">Log In to Dashboard →</button>
+      </form>
+
+      <div class="login-hint-box">
+        <span>Default Demo Accounts:</span>
+        <div><code>admin@menuscan.com</code> (Super Admin: <code>admin123</code>)</div>
+        <div><code>owner1@menuscan.com</code> (R001 Owner: <code>owner123</code>)</div>
+        <button type="button" class="quick-fill-btn" onclick="quickFillCredentials()">Click to Auto-Fill Super Admin</button>
+      </div>
+
+      <div class="login-footer">
+        <a href="index.html" class="login-back-link">← Return to Consumer Portal</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       2. AUTHENTICATED ADMIN DASHBOARD
+       ═══════════════════════════════════════════════ -->
+  <div id="admin-dashboard-app" style="display: none;">
+    <!-- Admin Header -->
+    <header class="admin-header">
+      <div class="admin-brand">
+        <div class="admin-brand-icon">⚡</div>
+        <span class="admin-brand-name">MenuScan</span>
+        <span class="admin-brand-tag" id="user-role-badge">CENTRAL ADMIN</span>
+      </div>
+      
+      <div class="admin-header-links">
+        <span id="user-display-name" style="font-size: 0.82rem; color: var(--text2); margin-right: 8px;"></span>
+        <button class="import-csv-btn" onclick="openImportCSVModal()">📥 Import CSV</button>
+        <button class="export-csv-btn" onclick="downloadDatabaseCSV()">💾 Export CSV</button>
+        <button class="reset-db-btn" onclick="handleResetDatabase()">🔄 Reset Seed Data</button>
+        <button class="logout-btn" onclick="handleAdminLogout()">🚪 Log Out</button>
+      </div>
+    </header>
+
+    <main class="admin-body">
+      <!-- Welcome & Action Bar -->
+      <div class="admin-top-bar">
+        <div>
+          <h1 class="admin-page-title">Platform Central Hub</h1>
+          <p class="admin-page-sub">Manage restaurants, live table orders, printable table QR codes, and catalog synchronization.</p>
+        </div>
+        <div class="admin-primary-actions">
+          <button class="btn-create" onclick="openAddRestaurantModal()">+ Add New Restaurant</button>
+          <button class="btn-create accent" onclick="openAddItemModal()">+ Add New Dish</button>
+        </div>
+      </div>
+
+      <!-- Platform Stats -->
+      <div class="admin-stats-grid">
+        <div class="admin-stat-card">
+          <span class="stat-icon">🏪</span>
+          <span class="stat-val" id="as-restaurants">0</span>
+          <span class="stat-lbl">Active Restaurants</span>
+        </div>
+        <div class="admin-stat-card">
+          <span class="stat-icon">🍽️</span>
+          <span class="stat-val" id="as-dishes">0</span>
+          <span class="stat-lbl">Total Menu Items</span>
+        </div>
+        <div class="admin-stat-card">
+          <span class="stat-icon">🟢</span>
+          <span class="stat-val" id="as-available">0</span>
+          <span class="stat-lbl">Available Today</span>
+        </div>
+        <div class="admin-stat-card">
+          <span class="stat-icon">🥗</span>
+          <span class="stat-val" id="as-veg">0</span>
+          <span class="stat-lbl">Vegetarian Dishes</span>
+        </div>
+        <div class="admin-stat-card highlight">
+          <span class="stat-icon">📱</span>
+          <span class="stat-val" id="as-scans">0</span>
+          <span class="stat-lbl">Total QR Scans</span>
+        </div>
+        <div class="admin-stat-card highlight">
+          <span class="stat-icon">📋</span>
+          <span class="stat-val" id="as-orders">0</span>
+          <span class="stat-lbl">Table Orders Placed</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs for Admin Sections -->
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="switchAdminTab('qr')" id="tab-btn-qr">📱 Table QR Codes</button>
+        <button class="admin-tab" onclick="switchAdminTab('restaurants')" id="tab-btn-restaurants">🏪 Manage Restaurants</button>
+        <button class="admin-tab" onclick="switchAdminTab('dishes')" id="tab-btn-dishes">🍽️ Dishes & Database</button>
+        <button class="admin-tab" onclick="switchAdminTab('orders')" id="tab-btn-orders">📋 Live Kitchen Orders</button>
+      </div>
+
+      <!-- ── SECTION 1: QR CODE MANAGER ── -->
+      <section id="section-qr" class="admin-tab-content active">
+        <div class="section-top">
+          <div>
+            <h2 class="admin-section-title">📱 Restaurant Assigned QR Codes</h2>
+            <p class="section-desc">Each restaurant has a permanent canonical QR code. You can also specify table numbers to generate table-specific QR stickers.</p>
+          </div>
+        </div>
+        <div id="qr-grid">
+          <!-- Injected dynamically by admin.js -->
+        </div>
+      </section>
+
+      <!-- ── SECTION 2: RESTAURANT MANAGER ── -->
+      <section id="section-restaurants" class="admin-tab-content">
+        <div class="section-top">
+          <div>
+            <h2 class="admin-section-title">🏪 Manage Restaurants</h2>
+            <p class="section-desc">Add, edit, or remove restaurants from the centralized platform.</p>
+          </div>
+          <button class="btn-create" onclick="openAddRestaurantModal()">+ Add New Restaurant</button>
+        </div>
+        <div id="restaurants-manage-grid">
+          <!-- Injected dynamically by admin.js -->
+        </div>
+      </section>
+
+      <!-- ── SECTION 3: DISHES & MENU DATABASE ── -->
+      <section id="section-dishes" class="admin-tab-content">
+        <div class="section-top">
+          <div>
+            <h2 class="admin-section-title">🗄️ Central Menu Database</h2>
+            <p class="section-desc">Add, edit, delete dishes, upload photos, update prices, and toggle in-stock availability in real time.</p>
+          </div>
+          <button class="btn-create accent" onclick="openAddItemModal()">+ Add New Dish</button>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="table-controls">
+          <select id="filter-restaurant" class="tbl-select" onchange="filterTable()">
+            <option value="all">All Restaurants</option>
+          </select>
+
+          <select id="filter-category" class="tbl-select" onchange="filterTable()">
+            <option value="all">All Categories</option>
+          </select>
+
+          <select id="filter-stock" class="tbl-select" onchange="filterTable()">
+            <option value="all">All Stock Status</option>
+            <option value="in_stock">In Stock Only</option>
+            <option value="out_stock">Sold Out Only</option>
+          </select>
+
+          <input type="text" id="table-search" class="tbl-search" placeholder="Search dish name, ID, ingredients..." oninput="searchTable()">
+
+          <span id="table-count">0 items</span>
+        </div>
+
+        <!-- Master Items Table -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Restaurant</th>
+                <th>Item ID</th>
+                <th>Dish Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Diet</th>
+                <th>Spice</th>
+                <th>Availability</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="items-tbody">
+              <!-- Injected dynamically by admin.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── SECTION 4: LIVE KITCHEN ORDERS ── -->
+      <section id="section-orders" class="admin-tab-content">
+        <div class="section-top">
+          <div>
+            <h2 class="admin-section-title">📋 Live Kitchen Orders Stream</h2>
+            <p class="section-desc">Real-time table orders placed by diners across all restaurant tenants.</p>
+          </div>
+          <div class="orders-top-actions">
+            <select id="filter-orders-restaurant" class="tbl-select" onchange="_renderOrdersList()">
+              <option value="all">All Restaurants</option>
+            </select>
+            <button class="btn-clear-orders" onclick="handleClearOrders()">🗑️ Clear History</button>
+          </div>
+        </div>
+
+        <div id="orders-stream-list" class="orders-stream-grid">
+          <!-- Injected dynamically by admin.js -->
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="admin-footer">
+        <p>MenuScan Multi-Restaurant Platform &bull; Real-time Centralized Database Engine</p>
+      </footer>
+    </main>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       3. MODALS (Add/Edit Restaurant, Dishes, Import CSV)
+       ═══════════════════════════════════════════════ -->
+
+  <!-- Modal: Add/Edit Restaurant -->
+  <div id="modal-restaurant" class="admin-modal" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 id="modal-rest-title">Add New Restaurant</h2>
+        <button class="modal-close" onclick="closeRestaurantModal()">✕</button>
+      </div>
+      <form id="form-restaurant" onsubmit="event.preventDefault(); saveRestaurantForm();">
+        <input type="hidden" id="rest-form-mode" value="add">
+        <input type="hidden" id="rest-form-id" value="">
+        <input type="hidden" id="rest-form-logo-url" value="">
+
+        <div class="modal-body">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="rest-form-name">Restaurant Name *</label>
+              <input type="text" id="rest-form-name" placeholder="e.g. Kyoto Sushi Bar" required>
+            </div>
+            <div class="form-group">
+              <label for="rest-form-cuisine">Cuisine Type *</label>
+              <input type="text" id="rest-form-cuisine" placeholder="e.g. Japanese" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="rest-form-tagline">Tagline</label>
+            <input type="text" id="rest-form-tagline" placeholder="e.g. Authentic Japanese Dining since 2010">
+          </div>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label for="rest-form-emoji">Logo Emoji</label>
+              <input type="text" id="rest-form-emoji" placeholder="🍣" maxlength="4" value="🍽️">
+            </div>
+            <div class="form-group">
+              <label for="rest-form-theme">Theme Color</label>
+              <input type="color" id="rest-form-theme" value="#E85D04" class="color-picker-input">
+            </div>
+            <div class="form-group">
+              <label for="rest-form-accent">Accent Color</label>
+              <input type="color" id="rest-form-accent" value="#F48C06" class="color-picker-input">
+            </div>
+          </div>
+
+          <!-- Logo Upload Field -->
+          <div class="form-group">
+            <label for="rest-form-logo-file">Upload Restaurant Logo (Optional)</label>
+            <input type="file" id="rest-form-logo-file" accept="image/*" onchange="handleLogoFileUpload(this.files)">
+            <span id="rest-logo-preview-lbl" style="font-size:0.75rem; color:var(--text2); display:block; margin-top:4px;">Supports PNG, JPG, WEBP (Max 5MB)</span>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="rest-form-opentime">Opening Time</label>
+              <input type="text" id="rest-form-opentime" placeholder="11:00 AM" value="11:00 AM">
+            </div>
+            <div class="form-group">
+              <label for="rest-form-closetime">Closing Time</label>
+              <input type="text" id="rest-form-closetime" placeholder="11:00 PM" value="11:00 PM">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="rest-form-address">Address</label>
+            <input type="text" id="rest-form-address" placeholder="e.g. 45 Indiranagar 100ft Road, Bangalore">
+          </div>
+
+          <div class="form-group">
+            <label for="rest-form-phone">Phone Contact</label>
+            <input type="text" id="rest-form-phone" placeholder="e.g. +91-80-9988-7766">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" onclick="closeRestaurantModal()">Cancel</button>
+          <button type="submit" class="btn-submit">Save Restaurant →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Dish -->
+  <div id="modal-dish" class="admin-modal" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 id="modal-dish-title">Add Menu Item</h2>
+        <button class="modal-close" onclick="closeDishModal()">✕</button>
+      </div>
+      <form id="form-dish" onsubmit="event.preventDefault(); saveDishForm();">
+        <input type="hidden" id="dish-form-mode" value="add">
+        <input type="hidden" id="dish-form-id" value="">
+        <input type="hidden" id="dish-form-img-url" value="">
+
+        <div class="modal-body">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="dish-form-restaurant">Restaurant *</label>
+              <select id="dish-form-restaurant" required>
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="dish-form-category">Category *</label>
+              <input type="text" id="dish-form-category" placeholder="Starters, Main Course, Desserts, Beverages" list="category-suggestions" required>
+              <datalist id="category-suggestions">
+                <option value="Starters">
+                <option value="Main Course">
+                <option value="Desserts">
+                <option value="Beverages">
+                <option value="Breads">
+                <option value="Sides">
+              </datalist>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="dish-form-name">Dish Name *</label>
+              <input type="text" id="dish-form-name" placeholder="e.g. Truffle Mushroom Risotto" required>
+            </div>
+            <div class="form-group">
+              <label for="dish-form-price">Price (₹) *</label>
+              <input type="number" id="dish-form-price" min="0" step="1" placeholder="299" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="dish-form-desc">Description</label>
+            <textarea id="dish-form-desc" rows="2" placeholder="Freshly prepared with authentic ingredients..."></textarea>
+          </div>
+
+          <!-- Food Image Upload and Alt Text -->
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="dish-form-img-file">Upload Food Image (Optional)</label>
+              <input type="file" id="dish-form-img-file" accept="image/*" onchange="handleDishImageUpload(this.files)">
+              <span id="dish-img-status-lbl" style="font-size:0.72rem; color:var(--text2);">Supports PNG, JPG, WEBP (Max 5MB)</span>
+            </div>
+            <div class="form-group">
+              <label for="dish-form-alt-text">Image Alt Text / Description</label>
+              <input type="text" id="dish-form-alt-text" placeholder="e.g. Plate of hot crispy samosas">
+            </div>
+          </div>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label for="dish-form-emoji">Emoji Fallback</label>
+              <input type="text" id="dish-form-emoji" placeholder="🍲" maxlength="4" value="🍽️">
+            </div>
+            <div class="form-group">
+              <label for="dish-form-spice">Spice Level</label>
+              <select id="dish-form-spice">
+                <option value="None">None</option>
+                <option value="Mild">Mild 🌶</option>
+                <option value="Medium">Medium 🌶🌶</option>
+                <option value="Hot">Hot 🌶🌶🌶</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="dish-form-diet">Dietary Type</label>
+              <select id="dish-form-diet">
+                <option value="true">🟢 Vegetarian</option>
+                <option value="false">🔴 Non-Vegetarian</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group-checkbox">
+              <input type="checkbox" id="dish-form-available" checked>
+              <label for="dish-form-available">Available in Stock</label>
+            </div>
+            <div class="form-group-checkbox">
+              <input type="checkbox" id="dish-form-bestseller">
+              <label for="dish-form-bestseller">Mark as ⭐ Bestseller</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" onclick="closeDishModal()">Cancel</button>
+          <button type="submit" class="btn-submit">Save Dish →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Import CSV File -->
+  <div id="modal-import-csv" class="admin-modal" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>📥 Import Menu Database CSV</h2>
+        <button class="modal-close" onclick="closeImportCSVModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="section-desc" style="margin-bottom: 1rem;">
+          Upload a structured <code>restaurants.csv</code> file to update or replace the current active catalog.
+        </p>
+        <div class="dropzone" id="csv-dropzone" onclick="document.getElementById('csv-file-input').click()">
+          <input type="file" id="csv-file-input" accept=".csv" style="display:none;" onchange="handleCSVFileSelect(this.files)">
+          <div class="dropzone-icon" id="csv-drop-icon">📄</div>
+          <p class="dropzone-text" id="csv-drop-text">Click or Drop CSV File here</p>
+          <span class="dropzone-sub">Accepts valid MenuScan CSV database schema</span>
+        </div>
+        <div id="csv-import-status" class="scanner-status" style="margin-top: 10px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" onclick="closeImportCSVModal()">Cancel</button>
+        <button type="button" id="csv-apply-btn" class="btn-submit" onclick="applyImportedCSV()" disabled>Apply Imported Database →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/database.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MenuScan — Contactless Multi-Restaurant Digital Menu Portal</title>
+  <meta name="description" content="Access instant dynamic digital menus for any restaurant by scanning QR codes, uploading a QR image, or choosing a restaurant.">
+  <link rel="stylesheet" href="css/index.css">
+  <!-- CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <a href="index.html" class="nav-brand" id="nav-brand">
+      <div class="nav-logo-icon">✨</div>
+      <span class="nav-logo-text">MenuScan</span>
+    </a>
+    <nav class="nav-links">
+      <button class="nav-btn" onclick="openScanner()" id="nav-scan-btn">📷 Scan Camera</button>
+      <button class="nav-btn secondary-btn" onclick="openUploadModal()" id="nav-upload-btn">🖼️ Upload QR Image</button>
+      <a href="admin.html" class="admin-login-link">🔐 Admin Hub</a>
+    </nav>
+  </header>
+
+  <!-- Main Hero Section -->
+  <main>
+    <section class="hero" id="hero-section">
+      <div class="hero-badge">⚡ Instant Contactless Dining Experience</div>
+      <h1 class="hero-title">Scan Table QR to <span>View Menu</span></h1>
+      <p class="hero-sub">
+        Point your smartphone camera at the table QR code, upload a photo of your QR code, or explore our integrated restaurants to view live interactive digital menus.
+      </p>
+
+      <!-- Primary Action Cards -->
+      <div class="hero-actions-container">
+        <!-- Option 1: Live Camera Scan -->
+        <div class="action-card" onclick="openScanner()" role="button" tabindex="0" aria-label="Open Camera QR Scanner">
+          <div class="action-icon">📷</div>
+          <h2 class="action-title">Scan Live QR Code</h2>
+          <p class="action-desc">Use your smartphone or device camera to scan the QR code on your dining table.</p>
+          <button class="action-btn">Open Camera Scanner →</button>
+        </div>
+
+        <!-- Option 2: Upload QR Image -->
+        <div class="action-card featured" onclick="openUploadModal()" role="button" tabindex="0" aria-label="Upload QR Image">
+          <div class="action-badge">Alternate Method</div>
+          <div class="action-icon">🖼️</div>
+          <h2 class="action-title">Upload QR Code Image</h2>
+          <p class="action-desc">Upload a photo, screenshot, or saved gallery image containing the table QR code.</p>
+          <button class="action-btn highlight">Choose QR Image / Drop File →</button>
+        </div>
+      </div>
+
+      <!-- Quick Manual Lookup with Optional Table Number -->
+      <div class="manual-inline-box">
+        <span class="mib-label">Or enter Restaurant & Table:</span>
+        <form class="mib-form" onsubmit="event.preventDefault(); manualNavigate();">
+          <input type="text" id="manual-id-input" placeholder="ID (e.g. R001, R002)" autocomplete="off" required>
+          <input type="text" id="manual-table-input" placeholder="Table (opt)" autocomplete="off" style="max-width: 100px;">
+          <button type="submit">Go →</button>
+        </form>
+      </div>
+      <div id="manual-error" class="manual-error"></div>
+    </section>
+
+    <!-- Platform Stats -->
+    <section class="stats-bar" aria-label="Platform Statistics">
+      <div class="stat-pill">
+        <span class="stat-num" id="stat-restaurants">4</span>
+        <span class="stat-label">Active Restaurants</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-num" id="stat-dishes">50</span>
+        <span class="stat-label">Dishes In Database</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-num" id="stat-available">50</span>
+        <span class="stat-label">Available Today</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-num">100%</span>
+        <span class="stat-label">Client-Side Secure</span>
+      </div>
+    </section>
+
+    <!-- Integrated Restaurants Directory / 1-Click Quick Demo -->
+    <section class="featured-section" aria-labelledby="featured-title">
+      <div class="section-header">
+        <h2 id="featured-title">Explore Partner Restaurants</h2>
+        <p>Select any restaurant below to preview their live branded digital menu instantly.</p>
+      </div>
+      <div class="restaurants-directory-grid" id="restaurants-directory-grid">
+        <!-- Injected dynamically by scanner.js -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Live Camera Scanner Modal -->
+  <div class="scanner-modal" id="scanner-modal" role="dialog" aria-modal="true" aria-labelledby="modal-camera-title">
+    <div class="scanner-box">
+      <div class="scanner-header">
+        <h2 id="modal-camera-title">📷 Scan Table QR Code</h2>
+        <button class="scanner-close" onclick="closeScanner()" aria-label="Close Scanner">✕</button>
+      </div>
+
+      <div id="qr-reader"></div>
+      <div id="scanner-status" class="scanner-status">Starting camera…</div>
+      
+      <div class="scanner-modal-footer">
+        <button class="switch-method-btn" onclick="closeScanner(); openUploadModal();">
+          🖼️ Switch to Upload QR Image
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload QR Code Image Modal -->
+  <div class="scanner-modal" id="upload-modal" role="dialog" aria-modal="true" aria-labelledby="modal-upload-title">
+    <div class="scanner-box">
+      <div class="scanner-header">
+        <h2 id="modal-upload-title">🖼️ Upload QR Code Image</h2>
+        <button class="scanner-close" onclick="closeUploadModal()" aria-label="Close Modal">✕</button>
+      </div>
+
+      <div class="dropzone" id="qr-dropzone" onclick="document.getElementById('qr-file-input').click()">
+        <input type="file" id="qr-file-input" accept="image/*" style="display:none;" onchange="handleQRFileUpload(this.files)">
+        <div class="dropzone-icon" id="dropzone-icon">📥</div>
+        <p class="dropzone-text" id="dropzone-text">Click or Drag & Drop your QR Code Image here</p>
+        <span class="dropzone-sub">Supports PNG, JPG, JPEG, WEBP screenshots</span>
+      </div>
+
+      <div id="upload-status" class="scanner-status">Ready to scan image</div>
+
+      <div class="scanner-modal-footer">
+        <button class="switch-method-btn" onclick="closeUploadModal(); openScanner();">
+          📷 Switch to Live Camera Scan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden reader element for file scans -->
+  <div id="hidden-qr-reader" style="display:none;"></div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>© 2026 MenuScan Platform &bull; Multi-Tenant Contactless Digital Menus &bull; <a href="admin.html">Platform Admin Login</a></p>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/database.js"></script>
+  <script src="js/scanner.js"></script>
+</body>
+</html>

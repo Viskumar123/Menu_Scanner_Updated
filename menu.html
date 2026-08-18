@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Digital Menu — MenuScan</title>
+  <meta name="description" content="View restaurant digital menu, customize orders, and explore dish details.">
+  <link rel="stylesheet" href="css/menu.css">
+  <!-- CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+
+  <!-- Loading / Error Overlay -->
+  <div id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading Restaurant Menu…</div>
+  </div>
+
+  <!-- Main Application Container (Strictly isolated to this specific restaurant) -->
+  <div id="menu-app">
+
+    <!-- Restaurant Header / Hero -->
+    <header id="restaurant-hero">
+      <div class="hero-top-nav">
+        <a href="index.html" class="hero-back-btn" title="Back to Scanner Portal">← Scan Another Menu</a>
+      </div>
+      <div class="hero-content">
+        <div class="r-logo" id="r-logo">🍽️</div>
+        <div class="r-info">
+          <div class="r-cuisine-pill" id="r-cuisine">Cuisine</div>
+          <h1 class="r-name" id="r-name">Restaurant Name</h1>
+          <p class="r-tagline" id="r-tagline">Tagline</p>
+          <div class="r-meta-chips">
+            <span class="r-chip" id="r-rating">⭐ 4.5</span>
+            <span class="r-chip" id="r-hours">🕐 11:00 AM – 11:00 PM</span>
+            <span class="r-chip" id="r-address">📍 Location</span>
+            <span class="r-chip" id="r-items">🍽️ 13 dishes</span>
+            <span class="r-chip table-chip" id="r-table" style="display: none;">🪑 Table #1</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sticky Navigation & Search Bar (No cross-restaurant navigation) -->
+    <nav id="sticky-nav">
+      <div class="sticky-nav-inner">
+        <div class="menu-brand-indicator">
+          <span class="mbi-dot"></span>
+          <span class="mbi-text" id="mbi-name">Digital Menu</span>
+        </div>
+        
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" class="search-input" placeholder="Search dishes, ingredients...">
+        </div>
+
+        <label class="veg-filter-row" title="Show Vegetarian Only">
+          <span>Veg Only</span>
+          <div class="veg-toggle-switch">
+            <input type="checkbox" id="veg-toggle" onchange="handleVegToggle()">
+            <span class="veg-slider"></span>
+          </div>
+        </label>
+
+        <button class="cart-trigger-btn" onclick="toggleCart()" id="cart-btn" aria-label="Open Order Cart">
+          <span>🛒</span>
+          <span>Cart</span>
+          <span id="cart-badge">0</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Horizontal Category Tabs -->
+    <div id="category-tabs-wrap">
+      <div id="category-tabs">
+        <!-- Injected dynamically by menu.js -->
+      </div>
+    </div>
+
+    <!-- Menu Dishes Grid Section -->
+    <main id="menu-section">
+      <div class="menu-topbar">
+        <span id="result-count">Loading items...</span>
+      </div>
+
+      <div id="menu-grid">
+        <!-- Injected dynamically by menu.js for THIS restaurant only -->
+      </div>
+
+      <div id="no-results">
+        <div class="nr-icon">🍽️</div>
+        <p>No dishes found</p>
+        <span>Try adjusting your search or category filter.</span>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Cart Background Overlay -->
+  <div id="cart-overlay" onclick="closeCart()"></div>
+
+  <!-- Cart Slide-over Panel -->
+  <aside id="cart-sidebar" aria-label="Order Cart">
+    <div class="cart-header">
+      <h2>Your Table Order</h2>
+      <button class="cart-close-btn" onclick="closeCart()" aria-label="Close cart">✕</button>
+    </div>
+
+    <!-- Table Number and Instructions in Cart -->
+    <div class="cart-table-bar">
+      <div class="cart-field-group">
+        <label for="cart-table-input">Table Number / Label:</label>
+        <input type="text" id="cart-table-input" placeholder="e.g. Table 4 or Takeaway" value="">
+      </div>
+    </div>
+
+    <div id="cart-items-list">
+      <!-- Injected by Cart.render() -->
+    </div>
+
+    <div class="cart-notes-box">
+      <input type="text" id="cart-notes-input" placeholder="Special instructions (e.g. mild spice, no onion)..." maxlength="120">
+    </div>
+
+    <div class="cart-summary">
+      <div class="cart-sum-row">
+        <span>Item Subtotal</span>
+        <span id="cart-subtotal">₹0</span>
+      </div>
+      <div class="cart-sum-row">
+        <span>Taxes & GST (5%)</span>
+        <span id="cart-tax">₹0</span>
+      </div>
+      <div class="cart-sum-row grand">
+        <span>Total Payable</span>
+        <span id="cart-grand">₹0</span>
+      </div>
+      <button id="place-order-btn" class="place-order-btn" onclick="placeOrder()" disabled>
+        Place Table Order →
+      </button>
+    </div>
+  </aside>
+
+  <!-- Order Success Modal -->
+  <div id="order-success-modal" role="dialog" aria-modal="true">
+    <div class="success-card">
+      <div class="success-icon">🎉</div>
+      <h2>Order Placed!</h2>
+      <p>Your order has been sent to the restaurant kitchen.</p>
+      
+      <div class="success-details-box">
+        <div class="sdb-row">
+          <span>Restaurant:</span>
+          <strong id="success-rest-name">—</strong>
+        </div>
+        <div class="sdb-row">
+          <span>Table / Seat:</span>
+          <strong id="success-table-num">—</strong>
+        </div>
+        <div class="sdb-row">
+          <span>Order Ref:</span>
+          <span id="success-order-num" class="order-ref-code">#ORD000000</span>
+        </div>
+        <div class="sdb-row total-row">
+          <span>Total Amount:</span>
+          <span id="success-order-total" class="success-total">₹0</span>
+        </div>
+      </div>
+
+      <div class="success-actions">
+        <button class="copy-ref-btn" onclick="copyOrderRef()">📋 Copy Order ID</button>
+        <button class="success-btn" onclick="closeSuccessModal()">Continue Dining →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/database.js"></script>
+  <script src="js/menu.js"></script>
+</body>
+</html>
