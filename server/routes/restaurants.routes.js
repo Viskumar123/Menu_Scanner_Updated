@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const { queryOne, queryAll, execute } = require('../db');
-const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { requireAuth, optionalAuth, requireRole } = require('../middleware/auth');
 const { enforceTenantAccess } = require('../middleware/tenant');
 
 function slugify(text) {
@@ -73,8 +73,8 @@ router.get('/:idOrSlug', (req, res) => {
   });
 });
 
-// POST /api/restaurants (Create New Tenant)
-router.post('/', requireAuth, (req, res) => {
+// POST /api/restaurants (Create New Tenant - SUPER_ADMIN ONLY)
+router.post('/', requireAuth, requireRole('SUPER_ADMIN'), (req, res) => {
   const {
     name, tagline = '', cuisine = 'Multi-Cuisine', themeColor = '#6c63ff',
     accentColor = '#a855f7', logoEmoji = '🍽️', logoUrl = '',
@@ -175,8 +175,8 @@ router.put('/:id', requireAuth, enforceTenantAccess, (req, res) => {
   res.json({ success: true, restaurant: updated });
 });
 
-// DELETE /api/restaurants/:id
-router.delete('/:id', requireAuth, enforceTenantAccess, (req, res) => {
+// DELETE /api/restaurants/:id (SUPER_ADMIN ONLY)
+router.delete('/:id', requireAuth, requireRole('SUPER_ADMIN'), (req, res) => {
   const id = req.params.id;
   execute('DELETE FROM restaurants WHERE id = ?', [id]);
   res.json({ success: true, message: `Restaurant ${id} deleted successfully.` });

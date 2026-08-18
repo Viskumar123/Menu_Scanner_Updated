@@ -42,6 +42,27 @@ function checkAuth() {
   }
 }
 
+function _getUserRestaurants() {
+  const all = DB.getAllRestaurants();
+  if (!_currentUser) return all;
+  if (_currentUser.role === 'SUPER_ADMIN') return all;
+
+  // For RESTAURANT_OWNER, filter by assigned restaurants or matching owner mapping
+  if (_currentUser.assignedRestaurants && _currentUser.assignedRestaurants.length > 0) {
+    const assignedIds = _currentUser.assignedRestaurants.map(r => r.id);
+    return all.filter(r => assignedIds.includes(r.id));
+  }
+
+  // Fallback match based on ID or email
+  const email = (_currentUser.email || '').toLowerCase();
+  if (email.includes('owner1')) return all.filter(r => r.id === 'R001');
+  if (email.includes('owner2')) return all.filter(r => r.id === 'R002');
+  if (email.includes('owner3')) return all.filter(r => r.id === 'R003');
+  if (email.includes('owner4')) return all.filter(r => r.id === 'R004');
+
+  return all.slice(0, 1);
+}
+
 async function handleAdminLogin() {
   const email = document.getElementById('login-email')?.value.trim();
   const pass = document.getElementById('login-password')?.value;
@@ -79,6 +100,27 @@ async function handleAdminLogin() {
     if (errBox) errBox.style.display = 'none';
     _showToast('Welcome back, Platform Administrator!', 'success');
     checkAuth();
+  } else if (email && (email.startsWith('owner') || email.includes('owner')) && (pass === 'owner123' || pass === 'owner')) {
+    const restMap = {
+      'owner1@menuscan.com': { id: 'USR_OWNER_1', name: 'Spice Garden Manager', restId: 'R001' },
+      'owner2@menuscan.com': { id: 'USR_OWNER_2', name: 'Dragon Palace Manager', restId: 'R002' },
+      'owner3@menuscan.com': { id: 'USR_OWNER_3', name: 'La Bella Italia Manager', restId: 'R003' },
+      'owner4@menuscan.com': { id: 'USR_OWNER_4', name: 'Burger Barn Manager', restId: 'R004' }
+    };
+    const matched = restMap[email] || { id: 'USR_OWNER_1', name: 'Restaurant Manager', restId: 'R001' };
+    _currentUser = {
+      id: matched.id,
+      name: matched.name,
+      email: email,
+      role: 'RESTAURANT_OWNER',
+      assignedRestaurants: [{ id: matched.restId }]
+    };
+    DB.setAuthToken('demo_token_owner');
+    sessionStorage.setItem(AUTH_KEY, 'demo_token_owner');
+    sessionStorage.setItem(USER_KEY, JSON.stringify(_currentUser));
+    if (errBox) errBox.style.display = 'none';
+    _showToast(`Welcome back, ${_currentUser.name}!`, 'success');
+    checkAuth();
   } else {
     if (errBox) {
       errBox.textContent = '❌ Invalid credentials. Try demo: admin@menuscan.com / admin123 or owner1@menuscan.com / owner123';
@@ -106,13 +148,33 @@ function handleAdminLogout() {
 function _updateUserUI() {
   const roleBadge = document.getElementById('user-role-badge');
   const nameEl = document.getElementById('user-display-name');
+  const addRestTop = document.getElementById('btn-add-restaurant-top');
+  const addRestSec = document.getElementById('btn-add-restaurant-section');
+  const importCsv = document.getElementById('btn-import-csv');
+  const resetDb = document.getElementById('btn-reset-db');
+
+  const isSuperAdmin = _currentUser && _currentUser.role === 'SUPER_ADMIN';
 
   if (roleBadge && _currentUser) {
-    roleBadge.textContent = _currentUser.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : 'RESTAURANT OWNER';
+    if (isSuperAdmin) {
+      roleBadge.textContent = 'SUPER ADMIN';
+      roleBadge.style.background = 'linear-gradient(135deg, #f4a261, #e76f51)';
+    } else {
+      const userRests = _getUserRestaurants();
+      const restName = userRests.length > 0 ? ` (${userRests[0].name})` : '';
+      roleBadge.textContent = `RESTAURANT OWNER${restName}`;
+      roleBadge.style.background = 'linear-gradient(135deg, #6c63ff, #a855f7)';
+    }
   }
   if (nameEl && _currentUser) {
     nameEl.textContent = `👤 ${_currentUser.name}`;
   }
+
+  // Toggle role-restricted UI elements
+  if (addRestTop) addRestTop.style.display = isSuperAdmin ? 'inline-flex' : 'none';
+  if (addRestSec) addRestSec.style.display = isSuperAdmin ? 'inline-flex' : 'none';
+  if (importCsv) importCsv.style.display = isSuperAdmin ? 'inline-block' : 'none';
+  if (resetDb) resetDb.style.display = isSuperAdmin ? 'inline-block' : 'none';
 }
 
 // ═══════════════════════════════════════════════
@@ -142,26 +204,34 @@ async function _refreshAllDashboard() {
 // 3. STATS & ANALYTICS
 // ═══════════════════════════════════════════════
 async function _renderStats() {
-  const stats = DB.getStats();
-  const all = DB.getAllRestaurants();
-  const orders = await DB.getOrders();
-
+  const userRests = _getUserRestaurants();
+  let totalItems = 0;
+  let availableItems = 0;
   let vegCount = 0;
-  all.forEach(r => {
+
+  userRests.forEach(r => {
     const items = DB.getMenuItems(r.id);
+    totalItems += items.length;
+    availableItems += items.filter(i => i.isAvailable).length;
     vegCount += items.filter(i => i.isVegetarian).length;
   });
 
-  _setText('as-restaurants', stats.totalRestaurants);
-  _setText('as-dishes', stats.totalItems);
-  _setText('as-available', stats.availableItems);
+  let totalOrdersCount = 0;
+  for (const r of userRests) {
+    const orders = await DB.getOrders(r.id);
+    totalOrdersCount += orders.length;
+  }
+
+  _setText('as-restaurants', userRests.length);
+  _setText('as-dishes', totalItems);
+  _setText('as-available', availableItems);
   _setText('as-veg', vegCount);
-  _setText('as-orders', orders.length);
+  _setText('as-orders', totalOrdersCount);
 
   // Try fetching live analytics scans count from API
   try {
-    if (all.length > 0) {
-      const firstRest = all[0].id;
+    if (userRests.length > 0) {
+      const firstRest = userRests[0].id;
       const res = await fetch(`/api/analytics/${firstRest}`, {
         headers: { 'Authorization': `Bearer ${DB.getAuthToken()}` }
       });
@@ -175,7 +245,7 @@ async function _renderStats() {
     }
   } catch (e) {}
 
-  _setText('as-scans', 24);
+  _setText('as-scans', userRests.length * 8 + 4);
 }
 
 // ═══════════════════════════════════════════════
@@ -191,7 +261,7 @@ function switchAdminTab(tabName) {
   if (sec) sec.classList.add('active');
 
   if (tabName === 'qr') {
-    setTimeout(() => _generateQRCodes(DB.getAllRestaurants()), 100);
+    setTimeout(() => _generateQRCodes(_getUserRestaurants()), 100);
   } else if (tabName === 'orders') {
     _renderOrdersList();
   }
@@ -203,7 +273,7 @@ function switchAdminTab(tabName) {
 function _renderQRPanels() {
   const grid = document.getElementById('qr-grid');
   if (!grid) return;
-  const restaurants = DB.getAllRestaurants();
+  const restaurants = _getUserRestaurants();
 
   grid.innerHTML = restaurants.map(r => `
     <div class="qr-panel" style="--pt:${r.themeColor};--pa:${r.accentColor}">
@@ -389,7 +459,8 @@ async function handleLogoFileUpload(files) {
 function _renderRestaurantsManageGrid() {
   const container = document.getElementById('restaurants-manage-grid');
   if (!container) return;
-  const restaurants = DB.getAllRestaurants();
+  const restaurants = _getUserRestaurants();
+  const isSuperAdmin = _currentUser && _currentUser.role === 'SUPER_ADMIN';
 
   container.innerHTML = restaurants.map(r => {
     const dishes = DB.getMenuItems(r.id);
@@ -403,7 +474,7 @@ function _renderRestaurantsManageGrid() {
           </div>
           <div class="rmc-btns">
             <button class="btn-action edit" onclick="openEditRestaurantModal('${r.id}')">✏️ Edit</button>
-            <button class="btn-action delete" onclick="deleteRestaurantConfirm('${r.id}')">🗑️ Delete</button>
+            ${isSuperAdmin ? `<button class="btn-action delete" onclick="deleteRestaurantConfirm('${r.id}')">🗑️ Delete</button>` : ''}
           </div>
         </div>
         <p class="rmc-tagline">${r.tagline || 'No tagline'}</p>
@@ -419,6 +490,11 @@ function _renderRestaurantsManageGrid() {
 }
 
 function openAddRestaurantModal() {
+  if (!_currentUser || _currentUser.role !== 'SUPER_ADMIN') {
+    _showToast('Access Denied: Only Super Admin can create new restaurants.', 'error');
+    return;
+  }
+
   document.getElementById('modal-rest-title').textContent = 'Add New Restaurant';
   document.getElementById('rest-form-mode').value = 'add';
   document.getElementById('rest-form-id').value = '';
@@ -428,8 +504,12 @@ function openAddRestaurantModal() {
 }
 
 function openEditRestaurantModal(id) {
-  const r = DB.getRestaurant(id);
-  if (!r) return;
+  const userRests = _getUserRestaurants();
+  const r = userRests.find(item => item.id === id) || DB.getRestaurant(id);
+  if (!r) {
+    _showToast('Access Denied: You cannot manage this restaurant.', 'error');
+    return;
+  }
 
   document.getElementById('modal-rest-title').textContent = `Edit "${r.name}"`;
   document.getElementById('rest-form-mode').value = 'edit';
@@ -473,6 +553,10 @@ async function saveRestaurantForm() {
   };
 
   if (mode === 'add') {
+    if (_currentUser?.role !== 'SUPER_ADMIN') {
+      _showToast('Access Denied: Only Super Admin can create new restaurants.', 'error');
+      return;
+    }
     await DB.addRestaurant(data);
     _showToast(`Added restaurant "${data.name}"`, 'success');
   } else {
@@ -485,6 +569,10 @@ async function saveRestaurantForm() {
 }
 
 async function deleteRestaurantConfirm(id) {
+  if (_currentUser?.role !== 'SUPER_ADMIN') {
+    _showToast('Access Denied: Only Super Admin can delete restaurants.', 'error');
+    return;
+  }
   const r = DB.getRestaurant(id);
   if (!r) return;
   if (confirm(`⚠️ Are you sure you want to delete "${r.name}" (${r.id}) and all of its dishes?`)) {
@@ -505,12 +593,15 @@ function openAddItemModal(preselectedRestaurantId) {
   document.getElementById('form-dish').reset();
   _setText('dish-img-status-lbl', 'Supports PNG, JPG, WEBP (Max 5MB)');
 
-  _populateDishRestaurantSelect(preselectedRestaurantId);
+  const userRests = _getUserRestaurants();
+  const defaultRestId = preselectedRestaurantId || (userRests.length > 0 ? userRests[0].id : undefined);
+
+  _populateDishRestaurantSelect(defaultRestId);
   document.getElementById('modal-dish').style.display = 'flex';
 }
 
 function openEditItemModal(itemId) {
-  const restaurants = DB.getAllRestaurants();
+  const restaurants = _getUserRestaurants();
   let foundItem = null;
   let restaurantId = null;
 
@@ -519,7 +610,10 @@ function openEditItemModal(itemId) {
     if (it) { foundItem = it; restaurantId = r.id; break; }
   }
 
-  if (!foundItem) return;
+  if (!foundItem) {
+    _showToast('Item not found or access denied.', 'error');
+    return;
+  }
 
   document.getElementById('modal-dish-title').textContent = `Edit "${foundItem.name}"`;
   document.getElementById('dish-form-mode').value = 'edit';
@@ -548,10 +642,20 @@ function openEditItemModal(itemId) {
 function _populateDishRestaurantSelect(selectedId) {
   const sel = document.getElementById('dish-form-restaurant');
   if (!sel) return;
-  sel.disabled = false;
-  sel.innerHTML = DB.getAllRestaurants().map(r => `
+  const userRests = _getUserRestaurants();
+  const isSuperAdmin = _currentUser && _currentUser.role === 'SUPER_ADMIN';
+
+  sel.innerHTML = userRests.map(r => `
     <option value="${r.id}" ${r.id === selectedId ? 'selected' : ''}>${r.logoEmoji} ${r.name}</option>
   `).join('');
+
+  if (!isSuperAdmin && userRests.length === 1) {
+    sel.value = userRests[0].id;
+    sel.disabled = true;
+  } else {
+    sel.disabled = false;
+    if (selectedId) sel.value = selectedId;
+  }
 }
 
 function closeDishModal() {
@@ -614,18 +718,27 @@ function _populateFilterDropdowns() {
 
   const currentR = rSel.value;
   const currentC = cSel.value;
-  const restaurants = DB.getAllRestaurants();
+  const restaurants = _getUserRestaurants();
+  const isSuperAdmin = _currentUser && _currentUser.role === 'SUPER_ADMIN';
 
-  const restOptions = `<option value="all">All Restaurants</option>` +
-    restaurants.map(r => `<option value="${r.id}">${r.logoEmoji} ${r.name}</option>`).join('');
+  let restOptions = '';
+  if (isSuperAdmin || restaurants.length > 1) {
+    restOptions += `<option value="all">All Restaurants</option>`;
+  }
+  restOptions += restaurants.map(r => `<option value="${r.id}">${r.logoEmoji} ${r.name}</option>`).join('');
 
   rSel.innerHTML = restOptions;
   if (oSel) oSel.innerHTML = restOptions;
 
-  const allCats = DB.getCategories();
+  const allCats = restaurants.length === 1 ? DB.getCategories(restaurants[0].id) : DB.getCategories();
   cSel.innerHTML = allCats.map(c => `<option value="${c}">${c === 'All' ? 'All Categories' : c}</option>`).join('');
 
-  rSel.value = currentR || 'all';
+  if (!isSuperAdmin && restaurants.length === 1) {
+    rSel.value = restaurants[0].id;
+    if (oSel) oSel.value = restaurants[0].id;
+  } else {
+    rSel.value = currentR || (isSuperAdmin ? 'all' : (restaurants[0]?.id || 'all'));
+  }
   cSel.value = currentC || 'all';
 }
 
@@ -636,15 +749,18 @@ function filterTable() {
   _renderItemsTable(rVal, cVal, sVal);
 }
 
-function _renderItemsTable(filterR = 'all', filterC = 'all', filterS = 'all') {
+function _renderItemsTable(filterR = null, filterC = 'all', filterS = 'all') {
   const tbody = document.getElementById('items-tbody');
   if (!tbody) return;
 
-  const restaurants = DB.getAllRestaurants();
+  const userRests = _getUserRestaurants();
+  const isSuperAdmin = _currentUser && _currentUser.role === 'SUPER_ADMIN';
+  const activeRFilter = filterR !== null ? filterR : (document.getElementById('filter-restaurant')?.value || (!isSuperAdmin && userRests.length === 1 ? userRests[0].id : 'all'));
+
   const rows = [];
 
-  restaurants.forEach(r => {
-    if (filterR !== 'all' && r.id !== filterR) return;
+  userRests.forEach(r => {
+    if (activeRFilter !== 'all' && r.id !== activeRFilter) return;
     const items = DB.getMenuItems(r.id,
       filterC !== 'all' ? { category: filterC } : {}
     );
@@ -713,8 +829,23 @@ async function _renderOrdersList() {
   const container = document.getElementById('orders-stream-list');
   if (!container) return;
 
-  const rFilter = document.getElementById('filter-orders-restaurant')?.value || 'all';
-  const orders = await DB.getOrders(rFilter);
+  const userRests = _getUserRestaurants();
+  const isSuperAdmin = _currentUser && _currentUser.role === 'SUPER_ADMIN';
+  const rFilter = document.getElementById('filter-orders-restaurant')?.value || (!isSuperAdmin && userRests.length === 1 ? userRests[0].id : 'all');
+
+  let orders = [];
+  if (rFilter === 'all') {
+    if (isSuperAdmin) {
+      orders = await DB.getOrders();
+    } else {
+      for (const r of userRests) {
+        const restOrders = await DB.getOrders(r.id);
+        orders = orders.concat(restOrders);
+      }
+    }
+  } else {
+    orders = await DB.getOrders(rFilter);
+  }
 
   if (orders.length === 0) {
     container.innerHTML = `

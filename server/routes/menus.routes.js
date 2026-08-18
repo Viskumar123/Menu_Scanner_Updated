@@ -110,15 +110,82 @@ router.post('/categories', requireAuth, (req, res) => {
 // 3. MENU ITEMS (/api/items/...)
 // ═══════════════════════════════════════════════
 
+// GET /api/items (All items or filtered across restaurants)
+router.get('/items', (req, res) => {
+  const { restaurantId, category, search, vegOnly, availableOnly } = req.query;
+
+  let query = `
+    SELECT mi.*, c.name as category_name, r.name as restaurant_name, r.theme_color, r.logo_emoji
+    FROM menu_items mi
+    JOIN categories c ON c.id = mi.category_id
+    JOIN restaurants r ON r.id = mi.restaurant_id
+    WHERE mi.status = 'ACTIVE'
+  `;
+  const params = [];
+
+  if (restaurantId && restaurantId !== 'all') {
+    query += ` AND mi.restaurant_id = ?`;
+    params.push(restaurantId);
+  }
+
+  if (category && category !== 'All') {
+    query += ` AND c.name = ?`;
+    params.push(category);
+  }
+
+  if (search && search.trim()) {
+    query += ` AND (mi.name LIKE ? OR mi.description LIKE ? OR c.name LIKE ? OR r.name LIKE ?)`;
+    const q = `%${search.trim()}%`;
+    params.push(q, q, q, q);
+  }
+
+  if (vegOnly === 'true' || vegOnly === '1') {
+    query += ` AND mi.is_vegetarian = 1`;
+  }
+
+  if (availableOnly === 'true' || availableOnly === '1') {
+    query += ` AND mi.is_available = 1`;
+  }
+
+  query += ` ORDER BY mi.restaurant_id ASC, mi.display_order ASC, mi.name ASC`;
+
+  const items = queryAll(query, params);
+
+  const formatted = items.map(i => ({
+    id: i.id,
+    restaurantId: i.restaurant_id,
+    restaurantName: i.restaurant_name,
+    themeColor: i.theme_color,
+    restaurantLogoEmoji: i.logo_emoji,
+    categoryId: i.category_id,
+    category: i.category_name,
+    name: i.name,
+    description: i.description,
+    price: i.price,
+    currency: i.currency,
+    imageUrl: i.image_url,
+    imageAltText: i.image_alt_text,
+    emoji: i.emoji,
+    isVegetarian: Boolean(i.is_vegetarian),
+    isAvailable: Boolean(i.is_available),
+    isBestseller: Boolean(i.is_bestseller),
+    spiceLevel: i.spice_level,
+    allergens: i.allergens
+  }));
+
+  res.json({ success: true, count: formatted.length, items: formatted });
+});
+
 // GET /api/items/:restaurantId (Public / Filtered Query)
 router.get('/items/:restaurantId', (req, res) => {
   const rid = req.params.restaurantId;
   const { category, search, vegOnly, availableOnly } = req.query;
 
   let query = `
-    SELECT mi.*, c.name as category_name
+    SELECT mi.*, c.name as category_name, r.name as restaurant_name
     FROM menu_items mi
     JOIN categories c ON c.id = mi.category_id
+    JOIN restaurants r ON r.id = mi.restaurant_id
     WHERE mi.restaurant_id = ? AND mi.status = 'ACTIVE'
   `;
   const params = [rid];
@@ -149,6 +216,7 @@ router.get('/items/:restaurantId', (req, res) => {
   const formatted = items.map(i => ({
     id: i.id,
     restaurantId: i.restaurant_id,
+    restaurantName: i.restaurant_name,
     categoryId: i.category_id,
     category: i.category_name,
     name: i.name,

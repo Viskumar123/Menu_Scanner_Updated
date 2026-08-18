@@ -90,8 +90,12 @@ R004,Burger Barn,Smash Burgers & American Classics,#F4A261,#E76F51,🍔,American
   async function load() {
     // 1. Try loading live data from Server REST API
     try {
-      const restRes = await fetch('/api/restaurants');
-      if (restRes.ok) {
+      const [restRes, itemsRes] = await Promise.all([
+        fetch('/api/restaurants').catch(() => null),
+        fetch('/api/items').catch(() => null)
+      ]);
+
+      if (restRes && restRes.ok) {
         const restJson = await restRes.json();
         if (restJson.success && restJson.restaurants && restJson.restaurants.length > 0) {
           _restaurants = restJson.restaurants.map(r => ({
@@ -112,13 +116,36 @@ R004,Burger Barn,Smash Burgers & American Classics,#F4A261,#E76F51,🍔,American
             menuId: `MENU_${r.id}`
           }));
 
+          if (itemsRes && itemsRes.ok) {
+            const itemsJson = await itemsRes.json();
+            if (itemsJson.success && Array.isArray(itemsJson.items)) {
+              _rawData = itemsJson.items.map(i => ({
+                restaurant_id: i.restaurantId || i.restaurant_id,
+                item_id: i.id || i.item_id,
+                item_name: i.name || i.item_name,
+                category: i.category || i.category_name || 'Main Course',
+                description: i.description || '',
+                price: parseFloat(i.price) || 0,
+                currency: i.currency || '₹',
+                image_url: i.imageUrl || i.image_url || '',
+                image_alt_text: i.imageAltText || i.image_alt_text || '',
+                item_emoji: i.emoji || i.item_emoji || '🍽️',
+                is_vegetarian: i.isVegetarian !== undefined ? i.isVegetarian : (i.is_vegetarian === true || i.is_vegetarian === 'true' || i.is_vegetarian === 1),
+                is_available: i.isAvailable !== undefined ? i.isAvailable : (i.is_available !== false && i.is_available !== 'false' && i.is_available !== 0),
+                is_bestseller: i.isBestseller !== undefined ? i.isBestseller : (i.is_bestseller === true || i.is_bestseller === 'true' || i.is_bestseller === 1),
+                spice_level: i.spiceLevel || i.spice_level || 'None',
+                allergens: i.allergens || ''
+              }));
+            }
+          }
+
           _isOnlineAPI = true;
           _saveState();
           return true;
         }
       }
     } catch (e) {
-      console.info('[MenuScan DB] API offline or static mode, falling back to local storage/CSV.');
+      console.info('[MenuScan DB] API offline or static mode, falling back to local storage/CSV.', e);
     }
 
     // 2. Fallback: check localStorage
@@ -207,7 +234,7 @@ R004,Burger Barn,Smash Burgers & American Classics,#F4A261,#E76F51,🍔,American
 
   async function fetchMenuItemsAPI(restaurantId, filters = {}) {
     try {
-      let url = `/api/items/${restaurantId}?`;
+      let url = restaurantId && restaurantId !== 'all' ? `/api/items/${restaurantId}?` : `/api/items?`;
       if (filters.category && filters.category !== 'All') url += `category=${encodeURIComponent(filters.category)}&`;
       if (filters.search) url += `search=${encodeURIComponent(filters.search)}&`;
       if (filters.vegOnly) url += `vegOnly=true&`;
@@ -224,52 +251,56 @@ R004,Burger Barn,Smash Burgers & American Classics,#F4A261,#E76F51,🍔,American
 
   function getMenuItems(restaurantId, filters = {}) {
     if (!_rawData) return [];
-    let rows = _rawData.filter(r => r.restaurant_id === restaurantId);
+    let rows = _rawData;
+    if (restaurantId && restaurantId !== 'all') {
+      rows = rows.filter(r => (r.restaurant_id || r.restaurantId) === restaurantId);
+    }
 
     if (filters.category && filters.category !== 'All') {
-      rows = rows.filter(r => r.category === filters.category);
+      rows = rows.filter(r => (r.category || r.category_name) === filters.category);
     }
     if (filters.search && filters.search.trim()) {
       const q = filters.search.toLowerCase();
       rows = rows.filter(r =>
-        (r.item_name && r.item_name.toLowerCase().includes(q)) ||
+        ((r.item_name || r.name) && (r.item_name || r.name).toLowerCase().includes(q)) ||
         (r.description && r.description.toLowerCase().includes(q)) ||
-        (r.category && r.category.toLowerCase().includes(q)) ||
-        (r.item_id && r.item_id.toLowerCase().includes(q))
+        ((r.category || r.category_name) && (r.category || r.category_name).toLowerCase().includes(q)) ||
+        ((r.item_id || r.id) && (r.item_id || r.id).toLowerCase().includes(q))
       );
     }
     if (filters.vegOnly) {
-      rows = rows.filter(r => r.is_vegetarian === 'true' || r.is_vegetarian === true || r.is_vegetarian === 1);
+      rows = rows.filter(r => r.is_vegetarian === true || r.is_vegetarian === 'true' || r.is_vegetarian === 1 || r.isVegetarian === true);
     }
     if (filters.availableOnly) {
-      rows = rows.filter(r => r.is_available === 'true' || r.is_available === true || r.is_available === 1);
+      rows = rows.filter(r => r.is_available === true || r.is_available === 'true' || r.is_available === 1 || r.isAvailable === true);
     }
 
     return rows.map(r => ({
-      id:          r.item_id,
-      name:        r.item_name,
-      category:    r.category || 'Main Course',
+      id:          r.item_id || r.id,
+      name:        r.item_name || r.name,
+      category:    r.category || r.category_name || 'Main Course',
       description: r.description || '',
       price:       parseFloat(r.price) || 0,
       currency:    r.currency    || '₹',
-      imageUrl:    r.image_url   || '',
-      imageAltText:r.image_alt_text || `${r.item_name} culinary presentation`,
-      emoji:       r.item_emoji  || '🍽️',
-      isVegetarian:r.is_vegetarian === 'true' || r.is_vegetarian === true || r.is_vegetarian === 1,
-      isAvailable: r.is_available  === 'true' || r.is_available === true || r.is_available === 1,
-      isBestseller:r.is_bestseller === 'true' || r.is_bestseller === true || r.is_bestseller === 1,
-      spiceLevel:  r.spice_level  || 'None',
-      restaurantId:r.restaurant_id
+      imageUrl:    r.image_url   || r.imageUrl || '',
+      imageAltText:r.image_alt_text || r.imageAltText || `${r.item_name || r.name} dish presentation`,
+      emoji:       r.item_emoji  || r.emoji || '🍽️',
+      isVegetarian:r.is_vegetarian === true || r.is_vegetarian === 'true' || r.is_vegetarian === 1 || r.isVegetarian === true,
+      isAvailable: r.is_available === true || r.is_available === 'true' || r.is_available === 1 || r.isAvailable === true,
+      isBestseller:r.is_bestseller === true || r.is_bestseller === 'true' || r.is_bestseller === 1 || r.isBestseller === true,
+      spiceLevel:  r.spice_level  || r.spiceLevel || 'None',
+      allergens:   r.allergens || '',
+      restaurantId:r.restaurant_id || r.restaurantId
     }));
   }
 
   function getCategories(restaurantId) {
     if (!_rawData) return ['All'];
     let filtered = _rawData;
-    if (restaurantId) {
-      filtered = _rawData.filter(r => r.restaurant_id === restaurantId);
+    if (restaurantId && restaurantId !== 'all') {
+      filtered = _rawData.filter(r => (r.restaurant_id || r.restaurantId) === restaurantId);
     }
-    const cats = [...new Set(filtered.map(r => r.category).filter(Boolean))];
+    const cats = [...new Set(filtered.map(r => r.category || r.category_name).filter(Boolean))];
     return ['All', ...cats];
   }
 
@@ -277,7 +308,7 @@ R004,Burger Barn,Smash Burgers & American Classics,#F4A261,#E76F51,🍔,American
     return {
       totalRestaurants: _restaurants?.length || 0,
       totalItems:       _rawData?.length || 0,
-      availableItems:   _rawData?.filter(r => r.is_available === 'true' || r.is_available === true || r.is_available === 1).length || 0
+      availableItems:   _rawData?.filter(r => r.is_available === true || r.is_available === 'true' || r.is_available === 1 || r.isAvailable === true).length || 0
     };
   }
 

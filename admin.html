@@ -67,9 +67,9 @@
       
       <div class="admin-header-links">
         <span id="user-display-name" style="font-size: 0.82rem; color: var(--text2); margin-right: 8px;"></span>
-        <button class="import-csv-btn" onclick="openImportCSVModal()">📥 Import CSV</button>
-        <button class="export-csv-btn" onclick="downloadDatabaseCSV()">💾 Export CSV</button>
-        <button class="reset-db-btn" onclick="handleResetDatabase()">🔄 Reset Seed Data</button>
+        <button id="btn-import-csv" class="import-csv-btn" onclick="openImportCSVModal()">📥 Import CSV</button>
+        <button id="btn-export-csv" class="export-csv-btn" onclick="downloadDatabaseCSV()">💾 Export CSV</button>
+        <button id="btn-reset-db" class="reset-db-btn" onclick="handleResetDatabase()">🔄 Reset Seed Data</button>
         <button class="logout-btn" onclick="handleAdminLogout()">🚪 Log Out</button>
       </div>
     </header>
@@ -82,7 +82,7 @@
           <p class="admin-page-sub">Manage restaurants, live table orders, printable table QR codes, and catalog synchronization.</p>
         </div>
         <div class="admin-primary-actions">
-          <button class="btn-create" onclick="openAddRestaurantModal()">+ Add New Restaurant</button>
+          <button id="btn-add-restaurant-top" class="btn-create" onclick="openAddRestaurantModal()">+ Add New Restaurant</button>
           <button class="btn-create accent" onclick="openAddItemModal()">+ Add New Dish</button>
         </div>
       </div>
@@ -149,7 +149,7 @@
             <h2 class="admin-section-title">🏪 Manage Restaurants</h2>
             <p class="section-desc">Add, edit, or remove restaurants from the centralized platform.</p>
           </div>
-          <button class="btn-create" onclick="openAddRestaurantModal()">+ Add New Restaurant</button>
+          <button id="btn-add-restaurant-section" class="btn-create" onclick="openAddRestaurantModal()">+ Add New Restaurant</button>
         </div>
         <div id="restaurants-manage-grid">
           <!-- Injected dynamically by admin.js -->

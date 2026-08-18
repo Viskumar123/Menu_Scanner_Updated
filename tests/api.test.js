@@ -116,6 +116,24 @@ async function runAPITests(app) {
     assert.ok(res.body.eventId.startsWith('EVT_'));
   });
 
+  // 7. GET /api/items returns all items across restaurants
+  await test('GET /api/items returns all dishes with normalized formatting', async () => {
+    const res = await makeRequest('GET', '/api/items');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.success, true);
+    assert.ok(res.body.items.length >= 50);
+  });
+
+  // 8. GET /index.html contains only Scan and Upload options
+  await test('GET /index.html serves streamlined 2-option customer landing page', async () => {
+    const res = await makeRequest('GET', '/index.html');
+    assert.strictEqual(res.status, 200);
+    assert.ok(res.body.includes('Scan Live QR Code'));
+    assert.ok(res.body.includes('Upload QR Image'));
+    assert.ok(!res.body.includes('restaurants-directory-grid'));
+    assert.ok(!res.body.includes('stat-restaurants'));
+  });
+
   return { passed, total };
 }
 

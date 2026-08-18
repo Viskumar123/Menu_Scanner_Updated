@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MenuScan — Contactless Multi-Restaurant Digital Menu Portal</title>
-  <meta name="description" content="Access instant dynamic digital menus for any restaurant by scanning QR codes, uploading a QR image, or choosing a restaurant.">
+  <title>MenuScan — Contactless Digital Menu Scanner</title>
+  <meta name="description" content="Access your table's digital menu instantly by scanning the table QR code or uploading a QR image.">
   <link rel="stylesheet" href="css/index.css">
   <!-- CDN Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -19,81 +19,39 @@
       <span class="nav-logo-text">MenuScan</span>
     </a>
     <nav class="nav-links">
-      <button class="nav-btn" onclick="openScanner()" id="nav-scan-btn">📷 Scan Camera</button>
-      <button class="nav-btn secondary-btn" onclick="openUploadModal()" id="nav-upload-btn">🖼️ Upload QR Image</button>
       <a href="admin.html" class="admin-login-link">🔐 Admin Hub</a>
     </nav>
   </header>
 
   <!-- Main Hero Section -->
-  <main>
+  <main class="main-container">
     <section class="hero" id="hero-section">
-      <div class="hero-badge">⚡ Instant Contactless Dining Experience</div>
+      <div class="hero-badge">⚡ Instant Contactless Dining</div>
       <h1 class="hero-title">Scan Table QR to <span>View Menu</span></h1>
       <p class="hero-sub">
-        Point your smartphone camera at the table QR code, upload a photo of your QR code, or explore our integrated restaurants to view live interactive digital menus.
+        Point your camera at the QR code on your dining table or upload a photo of your QR code to explore the digital menu.
       </p>
 
-      <!-- Primary Action Cards -->
+      <!-- Primary Action Cards: ONLY 2 Options (Scan & Upload) -->
       <div class="hero-actions-container">
         <!-- Option 1: Live Camera Scan -->
         <div class="action-card" onclick="openScanner()" role="button" tabindex="0" aria-label="Open Camera QR Scanner">
+          <div class="action-glow"></div>
           <div class="action-icon">📷</div>
           <h2 class="action-title">Scan Live QR Code</h2>
-          <p class="action-desc">Use your smartphone or device camera to scan the QR code on your dining table.</p>
+          <p class="action-desc">Use your smartphone or device camera to scan the QR code placed on your table.</p>
           <button class="action-btn">Open Camera Scanner →</button>
         </div>
 
         <!-- Option 2: Upload QR Image -->
         <div class="action-card featured" onclick="openUploadModal()" role="button" tabindex="0" aria-label="Upload QR Image">
-          <div class="action-badge">Alternate Method</div>
+          <div class="action-glow"></div>
+          <div class="action-badge">Upload Photo</div>
           <div class="action-icon">🖼️</div>
-          <h2 class="action-title">Upload QR Code Image</h2>
-          <p class="action-desc">Upload a photo, screenshot, or saved gallery image containing the table QR code.</p>
+          <h2 class="action-title">Upload QR Image</h2>
+          <p class="action-desc">Upload a photo, screenshot, or saved image containing your table QR code.</p>
           <button class="action-btn highlight">Choose QR Image / Drop File →</button>
         </div>
-      </div>
-
-      <!-- Quick Manual Lookup with Optional Table Number -->
-      <div class="manual-inline-box">
-        <span class="mib-label">Or enter Restaurant & Table:</span>
-        <form class="mib-form" onsubmit="event.preventDefault(); manualNavigate();">
-          <input type="text" id="manual-id-input" placeholder="ID (e.g. R001, R002)" autocomplete="off" required>
-          <input type="text" id="manual-table-input" placeholder="Table (opt)" autocomplete="off" style="max-width: 100px;">
-          <button type="submit">Go →</button>
-        </form>
-      </div>
-      <div id="manual-error" class="manual-error"></div>
-    </section>
-
-    <!-- Platform Stats -->
-    <section class="stats-bar" aria-label="Platform Statistics">
-      <div class="stat-pill">
-        <span class="stat-num" id="stat-restaurants">4</span>
-        <span class="stat-label">Active Restaurants</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-num" id="stat-dishes">50</span>
-        <span class="stat-label">Dishes In Database</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-num" id="stat-available">50</span>
-        <span class="stat-label">Available Today</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-num">100%</span>
-        <span class="stat-label">Client-Side Secure</span>
-      </div>
-    </section>
-
-    <!-- Integrated Restaurants Directory / 1-Click Quick Demo -->
-    <section class="featured-section" aria-labelledby="featured-title">
-      <div class="section-header">
-        <h2 id="featured-title">Explore Partner Restaurants</h2>
-        <p>Select any restaurant below to preview their live branded digital menu instantly.</p>
-      </div>
-      <div class="restaurants-directory-grid" id="restaurants-directory-grid">
-        <!-- Injected dynamically by scanner.js -->
       </div>
     </section>
   </main>
@@ -147,7 +105,7 @@
 
   <!-- Footer -->
   <footer class="footer">
-    <p>© 2026 MenuScan Platform &bull; Multi-Tenant Contactless Digital Menus &bull; <a href="admin.html">Platform Admin Login</a></p>
+    <p>© 2026 MenuScan &bull; Contactless Digital Menu Platform &bull; <a href="admin.html">Admin Hub</a></p>
   </footer>
 
   <!-- Scripts -->

@@ -20,58 +20,11 @@ let _fileScanner   = null;
 async function initLanding() {
   try {
     await DB.load();
-    _renderStats();
-    _renderDirectory();
     _setupDropzone();
     _setupKeyboardListeners();
   } catch (err) {
     console.error('[MenuScan] Failed to load DB:', err);
   }
-}
-
-// ═══════════════════════════════════════════════
-// STATS BAR
-// ═══════════════════════════════════════════════
-function _renderStats() {
-  const stats = DB.getStats();
-  _setText('stat-restaurants', stats.totalRestaurants);
-  _setText('stat-dishes',      stats.totalItems);
-  _setText('stat-available',   stats.availableItems);
-}
-
-// ═══════════════════════════════════════════════
-// RESTAURANT DIRECTORY
-// ═══════════════════════════════════════════════
-function _renderDirectory() {
-  const grid = document.getElementById('restaurants-directory-grid');
-  if (!grid) return;
-  const restaurants = DB.getAllRestaurants();
-
-  grid.innerHTML = restaurants.map(r => {
-    const items = DB.getMenuItems(r.id);
-    return `
-      <div class="dir-card" onclick="goToMenu('${r.id}')" style="--d-theme:${r.themeColor};--d-accent:${r.accentColor}">
-        <div class="dir-card-header" style="background: linear-gradient(135deg, ${r.themeColor}dd, ${r.accentColor}aa)">
-          <span class="dir-card-emoji">${r.logoEmoji}</span>
-          <span class="dir-cuisine-badge">${r.cuisine}</span>
-        </div>
-        <div class="dir-card-body">
-          <div class="dir-card-title-row">
-            <h3 class="dir-card-title">${r.name}</h3>
-            <span class="dir-rating">⭐ ${r.rating.toFixed(1)}</span>
-          </div>
-          <p class="dir-card-tagline">${r.tagline || 'Experience delicious dining & curated specialties.'}</p>
-          <div class="dir-card-meta">
-            <span>🍽️ ${items.length} dishes</span>
-            <span>🕐 ${r.openTime} – ${r.closeTime}</span>
-          </div>
-          <div class="dir-card-actions">
-            <button class="dir-view-btn" style="background:${r.themeColor}">View Digital Menu →</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
 }
 
 // ═══════════════════════════════════════════════
@@ -83,38 +36,6 @@ function goToMenu(restaurantId, tableNumber = null) {
     url += `&table=${encodeURIComponent(tableNumber)}`;
   }
   window.location.href = url;
-}
-
-// ═══════════════════════════════════════════════
-// MANUAL ID & TABLE LOOKUP
-// ═══════════════════════════════════════════════
-function manualNavigate() {
-  const idInput    = document.getElementById('manual-id-input');
-  const tableInput = document.getElementById('manual-table-input');
-  const val        = idInput?.value.trim().toUpperCase();
-  const tableVal   = tableInput?.value.trim();
-
-  if (!val) {
-    _showInputError('Please enter a valid Restaurant ID (e.g., R001)');
-    return;
-  }
-
-  const r = DB.getRestaurant(val);
-  if (!r) {
-    _showInputError(`No restaurant found with ID "${val}". Try R001, R002, R003, or R004.`);
-    return;
-  }
-
-  goToMenu(val, tableVal || null);
-}
-
-function _showInputError(msg) {
-  const el = document.getElementById('manual-error');
-  if (!el) return;
-  el.textContent = msg;
-  el.style.display = 'block';
-  clearTimeout(el._timer);
-  el._timer = setTimeout(() => (el.style.display = 'none'), 4000);
 }
 
 // ═══════════════════════════════════════════════

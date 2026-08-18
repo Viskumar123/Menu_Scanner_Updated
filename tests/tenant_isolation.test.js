@@ -104,7 +104,56 @@ async function runTenantIsolationTests(app) {
     assert.strictEqual(res.body.success, false);
   });
 
-  // 6. Super Admin can access and modify any restaurant -> 200 OK
+  // 6. Restaurant Owner attempting to create a new restaurant -> 403 Forbidden
+  await test('Restaurant Owner attempting to create new restaurant receives 403 Forbidden', async () => {
+    const res = await makeRequest('POST', '/api/restaurants', {
+      'Authorization': `Bearer ${owner1Token}`
+    }, {
+      name: 'Owner New Restaurant'
+    });
+
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.body.success, false);
+  });
+
+  // 7. Restaurant Owner attempting to delete a restaurant -> 403 Forbidden
+  await test('Restaurant Owner attempting to delete a restaurant receives 403 Forbidden', async () => {
+    const res = await makeRequest('DELETE', '/api/restaurants/R001', {
+      'Authorization': `Bearer ${owner1Token}`
+    });
+
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.body.success, false);
+  });
+
+  // 8. Restaurant Owner can modify their OWN restaurant -> 200 OK
+  await test('Restaurant Owner can modify their own restaurant details', async () => {
+    const res = await makeRequest('PUT', '/api/restaurants/R001', {
+      'Authorization': `Bearer ${owner1Token}`
+    }, { tagline: 'Updated Spice Garden Tagline' });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.success, true);
+    assert.strictEqual(res.body.restaurant.tagline, 'Updated Spice Garden Tagline');
+  });
+
+  // 9. Restaurant Owner can add dish to their OWN restaurant -> 201 Created
+  await test('Restaurant Owner can add dish to their own restaurant', async () => {
+    const res = await makeRequest('POST', '/api/items', {
+      'Authorization': `Bearer ${owner1Token}`
+    }, {
+      restaurantId: 'R001',
+      name: 'Owner Authorized Dish',
+      price: 199,
+      categoryName: 'Starters'
+    });
+
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.success, true);
+    assert.strictEqual(res.body.item.name, 'Owner Authorized Dish');
+  });
+
+  // 10. Super Admin can access and modify any restaurant -> 200 OK
   const admin = queryOne('SELECT * FROM users WHERE email = ?', ['admin@menuscan.com']);
   const adminToken = generateToken(admin);
 

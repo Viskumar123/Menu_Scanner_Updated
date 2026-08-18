@@ -114,7 +114,7 @@ body::before {
 /* ─── Hero ─────────────────────────────────── */
 .hero {
   position: relative; z-index: 1;
-  min-height: 85vh;
+  min-height: calc(100vh - 140px);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   padding: 100px 2rem 3rem;
@@ -148,35 +148,35 @@ body::before {
 
 .hero-sub {
   font-size: 1.1rem; color: var(--text2); max-width: 580px;
-  line-height: 1.6; margin-bottom: 2.5rem;
+  line-height: 1.6; margin-bottom: 3rem;
 }
 
 /* ─── Action Cards Container ───────────────── */
 .hero-actions-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 340px));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 360px));
+  gap: 2rem;
   justify-content: center;
   width: 100%;
-  max-width: 760px;
-  margin-bottom: 2.5rem;
+  max-width: 800px;
+  margin-bottom: 2rem;
 }
 
 .action-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 2rem 1.75rem;
+  padding: 2.5rem 2rem;
   display: flex; flex-direction: column; align-items: center; text-align: center;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.25,0.8,0.25,1);
+  transition: all 0.35s cubic-bezier(0.25,0.8,0.25,1);
   position: relative; overflow: hidden;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
 }
 .action-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-8px);
   border-color: var(--gold);
-  box-shadow: 0 16px 40px rgba(0,0,0,0.5), 0 0 24px rgba(244,162,97,0.15);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.6), 0 0 32px rgba(244,162,97,0.2);
 }
 
 .action-card.featured {
@@ -185,95 +185,43 @@ body::before {
 }
 
 .action-badge {
-  position: absolute; top: 12px; right: 12px;
+  position: absolute; top: 14px; right: 14px;
   background: rgba(244,162,97,0.18); border: 1px solid rgba(244,162,97,0.4);
-  color: var(--gold); font-size: 0.68rem; font-weight: 700;
+  color: var(--gold); font-size: 0.7rem; font-weight: 700;
   padding: 3px 10px; border-radius: 100px; text-transform: uppercase;
 }
 
 .action-icon {
-  font-size: 3rem; margin-bottom: 1rem;
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.4));
+  font-size: 3.5rem; margin-bottom: 1.25rem;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
   transition: transform 0.3s;
 }
 .action-card:hover .action-icon { transform: scale(1.15); }
 
 .action-title {
-  font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #fff;
+  font-size: 1.35rem; font-weight: 700; margin-bottom: 0.6rem; color: #fff;
 }
 .action-desc {
-  font-size: 0.85rem; color: var(--text2); line-height: 1.5; margin-bottom: 1.5rem; flex: 1;
+  font-size: 0.9rem; color: var(--text2); line-height: 1.55; margin-bottom: 1.75rem; flex: 1;
 }
 
 .action-btn {
-  width: 100%; padding: 12px 16px; border-radius: 12px;
+  width: 100%; padding: 14px 18px; border-radius: 12px;
   background: var(--surface); border: 1px solid var(--border2);
-  color: var(--text); font-size: 0.88rem; font-weight: 600;
+  color: var(--text); font-size: 0.92rem; font-weight: 600;
   font-family: 'Inter', sans-serif; cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s;
 }
 .action-btn.highlight {
   background: linear-gradient(135deg, var(--gold), var(--gold2));
   color: #fff; border: none; font-weight: 700;
-  box-shadow: 0 4px 16px rgba(244,162,97,0.3);
+  box-shadow: 0 4px 16px rgba(244,162,97,0.35);
 }
 .action-card:hover .action-btn {
   background: linear-gradient(135deg, var(--gold), var(--gold2));
   color: #fff; border-color: transparent;
+  box-shadow: 0 6px 20px rgba(244,162,97,0.4);
 }
-
-/* ─── Manual Inline Entry ──────────────────── */
-.manual-inline-box {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
-  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-  padding: 8px 16px; border-radius: 100px;
-}
-.mib-label { font-size: 0.82rem; color: var(--text2); }
-.mib-form { display: flex; align-items: center; gap: 6px; }
-.mib-form input {
-  background: var(--bg2); border: 1px solid var(--border2);
-  color: var(--text); padding: 6px 12px; border-radius: 8px;
-  font-family: 'Inter', sans-serif; font-size: 0.85rem; width: 140px;
-  outline: none; text-transform: uppercase;
-}
-.mib-form input:focus { border-color: var(--gold); }
-.mib-form button {
-  background: var(--surface); border: 1px solid var(--border2);
-  color: var(--gold); padding: 6px 12px; border-radius: 8px;
-  font-size: 0.85rem; font-weight: 700; cursor: pointer;
-}
-.mib-form button:hover { background: var(--gold); color: #fff; }
-
-.manual-error {
-  display: none; margin-top: 10px; color: #ff6b6b; font-size: 0.85rem;
-}
-
-/* ─── Stats Bar ─────────────────────────────── */
-.stats-bar {
-  position: relative; z-index: 1;
-  display: flex; justify-content: center; gap: 2px;
-  padding: 1rem 2rem 3rem;
-  flex-wrap: wrap; max-width: 960px; margin: 0 auto;
-}
-
-.stat-pill {
-  display: flex; flex-direction: column; align-items: center;
-  padding: 1.25rem 2rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  min-width: 140px;
-  backdrop-filter: blur(10px);
-}
-.stat-pill:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-.stat-pill:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
-
-.stat-num {
-  font-size: 1.8rem; font-weight: 800;
-  background: linear-gradient(135deg, #f4a261, #e76f51);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
-.stat-label { font-size: 0.72rem; color: var(--text2); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* ─── Scanner & Upload Modals ──────────────── */
 .scanner-modal {
@@ -348,88 +296,10 @@ body::before {
 }
 .switch-method-btn:hover { color: var(--text); border-color: var(--border2); }
 
-/* ─── Featured Restaurants Directory ────────── */
-.featured-section {
-  position: relative; z-index: 1;
-  max-width: 1100px; margin: 3.5rem auto 4rem; padding: 0 1.5rem;
-}
-.section-header {
-  text-align: center; margin-bottom: 2rem;
-}
-.section-header h2 {
-  font-family: 'Playfair Display', serif; font-size: 1.8rem;
-  font-weight: 700; color: #fff; margin-bottom: 0.5rem;
-}
-.section-header p {
-  color: var(--text2); font-size: 0.9rem;
-}
-
-.restaurants-directory-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1.5rem;
-}
-
-.dir-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
-  display: flex; flex-direction: column;
-}
-.dir-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--d-theme, var(--gold));
-  box-shadow: 0 12px 30px rgba(0,0,0,0.4);
-}
-
-.dir-card-header {
-  padding: 1.5rem 1rem;
-  display: flex; align-items: center; justify-content: space-between;
-}
-.dir-card-emoji { font-size: 2.5rem; }
-.dir-cuisine-badge {
-  background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
-  color: #fff; padding: 4px 10px; border-radius: 20px;
-  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-}
-
-.dir-card-body {
-  padding: 1.25rem;
-  display: flex; flex-direction: column; flex: 1;
-}
-.dir-card-title-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-  margin-bottom: 0.4rem;
-}
-.dir-card-title {
-  font-size: 1.05rem; font-weight: 700; color: #fff;
-}
-.dir-rating {
-  font-size: 0.8rem; font-weight: 600; color: var(--gold);
-}
-.dir-card-tagline {
-  font-size: 0.78rem; color: var(--text2); line-height: 1.4;
-  margin-bottom: 1rem; flex: 1;
-}
-.dir-card-meta {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 0.75rem; color: var(--text2); padding-top: 0.75rem;
-  border-top: 1px solid var(--border); margin-bottom: 1rem;
-}
-.dir-view-btn {
-  width: 100%; padding: 8px; border-radius: 8px;
-  border: none; color: #fff; font-size: 0.82rem; font-weight: 600;
-  cursor: pointer; transition: opacity 0.2s;
-}
-.dir-view-btn:hover { opacity: 0.9; }
-
 /* ─── Footer ─────────────────────────────────── */
 .footer {
   position: relative; z-index: 1;
-  text-align: center; padding: 2.5rem 2rem;
+  text-align: center; padding: 2rem;
   border-top: 1px solid var(--border);
   color: var(--text2); font-size: 0.82rem;
 }
@@ -441,9 +311,4 @@ body::before {
   .navbar { padding: 0 1rem; }
   .hero { padding: 85px 1.25rem 2.5rem; }
   .hero-title { font-size: 2.2rem; }
-  .stats-bar { gap: 0; }
-  .stat-pill { min-width: 0; flex: 1; padding: 1rem; }
-  .stat-pill:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-  .stat-pill:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
-  .stat-pill:not(:first-child):not(:last-child) { border-radius: 0; }
 }
