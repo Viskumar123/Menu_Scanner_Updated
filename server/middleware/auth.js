@@ -16,7 +16,7 @@ function generateToken(user) {
   );
 }
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization || req.headers['x-auth-token'];
   let token = null;
 
@@ -37,7 +37,7 @@ function requireAuth(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = queryOne('SELECT id, name, email, role, status FROM users WHERE id = ?', [decoded.id]);
+    const user = await queryOne('SELECT id, name, email, role, status FROM users WHERE id = ?', [decoded.id]);
 
     if (!user || user.status !== 'ACTIVE') {
       return res.status(401).json({
@@ -56,14 +56,14 @@ function requireAuth(req, res, next) {
   }
 }
 
-function optionalAuth(req, res, next) {
+async function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return next();
 
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = queryOne('SELECT id, name, email, role, status FROM users WHERE id = ?', [decoded.id]);
+    req.user = await queryOne('SELECT id, name, email, role, status FROM users WHERE id = ?', [decoded.id]);
   } catch (e) {}
   next();
 }

@@ -1,58 +1,118 @@
 /**
- * server/db/index.js — SQLite Database Connection & Query Wrapper.
- * Uses native Node.js 24 SQLite engine (node:sqlite) for high performance & zero external binary dependencies.
+ * server/db/index.js — Turso (libSQL) Database Connection & Async Query Wrapper.
+ * Uses @libsql/client for edge-distributed, cloud-hosted SQLite (Turso).
+ *
+ * Environment variables:
+ *   TURSO_DATABASE_URL  — libSQL URL, e.g. libsql://your-db.turso.io
+ *                         Falls back to file:./data/menuscan.db for local dev.
+ *   TURSO_AUTH_TOKEN    — Auth token from `turso db tokens create <db>`
+ *                         Leave blank for local file-based usage.
  */
 
-const { DatabaseSync } = require('node:sqlite');
+const { createClient } = require('@libsql/client');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const DB_DIR = path.join(__dirname, '../../data');
-const DB_PATH = path.join(DB_DIR, 'menuscan.db');
-const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
+require('dotenv').config();
 
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+// ── Connection Setup ─────────────────────────────────────────────
+
+// Ensure local data dir exists (used when falling back to local file)
+const DATA_DIR = path.join(__dirname, '../../data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-let dbInstance = null;
+const DB_URL = process.env.TURSO_DATABASE_URL || `file:${path.join(DATA_DIR, 'menuscan.db')}`;
+const DB_AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN || undefined;
 
+// Legacy export kept for callers that import DB_PATH (e.g. old tests)
+const DB_PATH = path.join(DATA_DIR, 'menuscan.db');
+
+let _client = null;
+
+/**
+ * Returns the singleton @libsql/client instance.
+ * Lazily initialized on first call.
+ */
 function getDB() {
-  if (!dbInstance) {
-    dbInstance = new DatabaseSync(DB_PATH);
-    // Execute schema migrations on connection
-    if (fs.existsSync(SCHEMA_PATH)) {
-      const schemaSql = fs.readFileSync(SCHEMA_PATH, 'utf8');
-      dbInstance.exec(schemaSql);
-    }
+  if (!_client) {
+    _client = createClient({
+      url: DB_URL,
+      authToken: DB_AUTH_TOKEN
+    });
   }
-  return dbInstance;
+  return _client;
 }
 
-// ── Query Helpers ────────────────────────────────────────────────
+// ── Async Query Helpers ──────────────────────────────────────────
 
-function queryOne(sql, params = []) {
-  const db = getDB();
-  const stmt = db.prepare(sql);
-  const rows = stmt.all(...params);
-  return rows.length > 0 ? rows[0] : null;
+/**
+ * Execute a query and return the first row, or null.
+ * @param {string} sql
+ * @param {any[]} params
+ */
+async function queryOne(sql, params = []) {
+  const client = getDB();
+  const result = await client.execute({ sql, args: params });
+  if (!result.rows || result.rows.length === 0) return null;
+  return _rowToObject(result.columns, result.rows[0]);
 }
 
-function queryAll(sql, params = []) {
-  const db = getDB();
-  const stmt = db.prepare(sql);
-  return stmt.all(...params);
+/**
+ * Execute a query and return all rows as plain objects.
+ * @param {string} sql
+ * @param {any[]} params
+ */
+async function queryAll(sql, params = []) {
+  const client = getDB();
+  const result = await client.execute({ sql, args: params });
+  if (!result.rows) return [];
+  return result.rows.map(row => _rowToObject(result.columns, row));
 }
 
-function execute(sql, params = []) {
-  const db = getDB();
-  const stmt = db.prepare(sql);
-  return stmt.run(...params);
+/**
+ * Execute a mutating statement (INSERT / UPDATE / DELETE).
+ * Returns the libSQL ResultSet (includes .rowsAffected, .lastInsertRowid).
+ * @param {string} sql
+ * @param {any[]} params
+ */
+async function execute(sql, params = []) {
+  const client = getDB();
+  return client.execute({ sql, args: params });
 }
 
-function execScript(sqlScript) {
-  const db = getDB();
-  db.exec(sqlScript);
+/**
+ * Execute multiple SQL statements in sequence (for schema init).
+ * Splits on ';' and runs each non-empty statement individually.
+ * @param {string} sqlScript
+ */
+async function execScript(sqlScript) {
+  const client = getDB();
+  const statements = sqlScript
+    .split(';')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && !s.startsWith('--'));
+
+  for (const stmt of statements) {
+    await client.execute({ sql: stmt, args: [] });
+  }
+}
+
+// ── Internal Helpers ─────────────────────────────────────────────
+
+/**
+ * Convert a libSQL row (array) + columns array into a plain JS object.
+ * Turso rows are array-like — we need to map column names to values.
+ */
+function _rowToObject(columns, row) {
+  const obj = {};
+  columns.forEach((col, i) => {
+    const val = row[i];
+    // Convert BigInt (lastInsertRowid, COUNT) to Number for compatibility
+    obj[col] = typeof val === 'bigint' ? Number(val) : val;
+  });
+  return obj;
 }
 
 module.exports = {
@@ -61,5 +121,5 @@ module.exports = {
   queryAll,
   execute,
   execScript,
-  DB_PATH
+  DB_PATH  // kept for backward-compat
 };

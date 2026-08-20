@@ -19,14 +19,14 @@ function slugify(text) {
 }
 
 // GET /api/restaurants (Public list or user's restaurants)
-router.get('/', optionalAuth, (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   if (req.user && req.user.role === 'SUPER_ADMIN') {
-    const all = queryAll('SELECT * FROM restaurants ORDER BY name ASC');
+    const all = await queryAll('SELECT * FROM restaurants ORDER BY name ASC');
     return res.json({ success: true, count: all.length, restaurants: all });
   }
 
   if (req.user && req.user.role === 'RESTAURANT_OWNER') {
-    const owned = queryAll(`
+    const owned = await queryAll(`
       SELECT r.*, ru.role as user_role
       FROM restaurant_users ru
       JOIN restaurants r ON r.id = ru.restaurant_id
@@ -37,7 +37,7 @@ router.get('/', optionalAuth, (req, res) => {
   }
 
   // Public directory: active restaurants only
-  const publicList = queryAll(`
+  const publicList = await queryAll(`
     SELECT id, name, slug, tagline, theme_color, accent_color, logo_url, logo_emoji,
            cuisine, rating, address, phone, open_time, close_time
     FROM restaurants
@@ -48,9 +48,9 @@ router.get('/', optionalAuth, (req, res) => {
 });
 
 // GET /api/restaurants/:idOrSlug
-router.get('/:idOrSlug', (req, res) => {
+router.get('/:idOrSlug', async (req, res) => {
   const param = req.params.idOrSlug;
-  const restaurant = queryOne(`
+  const restaurant = await queryOne(`
     SELECT * FROM restaurants
     WHERE id = ? OR slug = ?
   `, [param, param]);
@@ -60,11 +60,11 @@ router.get('/:idOrSlug', (req, res) => {
   }
 
   // Get active menu
-  const menu = queryOne(`
+  const menu = await queryOne(`
     SELECT * FROM menus
     WHERE restaurant_id = ? AND status = 'PUBLISHED'
     ORDER BY version DESC LIMIT 1
-  `, [restaurant.id]) || queryOne('SELECT * FROM menus WHERE restaurant_id = ? LIMIT 1', [restaurant.id]);
+  `, [restaurant.id]) || await queryOne('SELECT * FROM menus WHERE restaurant_id = ? LIMIT 1', [restaurant.id]);
 
   res.json({
     success: true,
@@ -74,7 +74,7 @@ router.get('/:idOrSlug', (req, res) => {
 });
 
 // POST /api/restaurants (Create New Tenant - SUPER_ADMIN ONLY)
-router.post('/', requireAuth, requireRole('SUPER_ADMIN'), (req, res) => {
+router.post('/', requireAuth, requireRole('SUPER_ADMIN'), async (req, res) => {
   const {
     name, tagline = '', cuisine = 'Multi-Cuisine', themeColor = '#6c63ff',
     accentColor = '#a855f7', logoEmoji = '🍽️', logoUrl = '',
@@ -86,19 +86,20 @@ router.post('/', requireAuth, requireRole('SUPER_ADMIN'), (req, res) => {
   }
 
   // Generate unique ID & Slug
-  const count = queryOne('SELECT COUNT(*) as cnt FROM restaurants')?.cnt || 0;
+  const countRow = await queryOne('SELECT COUNT(*) as cnt FROM restaurants');
+  const count = countRow?.cnt || 0;
   const newId = `R${String(count + 1).padStart(3, '0')}`;
   let baseSlug = slugify(name);
   let slug = baseSlug;
   let sCount = 1;
-  while (queryOne('SELECT id FROM restaurants WHERE slug = ?', [slug])) {
+  while (await queryOne('SELECT id FROM restaurants WHERE slug = ?', [slug])) {
     slug = `${baseSlug}-${++sCount}`;
   }
 
   const menuId = `MENU_${newId}`;
 
   // Insert Restaurant
-  execute(`
+  await execute(`
     INSERT INTO restaurants (
       id, name, slug, tagline, theme_color, accent_color, logo_url, logo_emoji,
       cuisine, rating, address, phone, open_time, close_time, status
@@ -106,24 +107,24 @@ router.post('/', requireAuth, requireRole('SUPER_ADMIN'), (req, res) => {
   `, [newId, name.trim(), slug, tagline, themeColor, accentColor, logoUrl, logoEmoji, cuisine, 4.5, address, phone, openTime, closeTime]);
 
   // Insert Default Menu
-  execute(`
+  await execute(`
     INSERT INTO menus (id, restaurant_id, name, description, status, version)
     VALUES (?, ?, ?, ?, 'PUBLISHED', 1)
   `, [menuId, newId, 'Main Menu', `Menu for ${name}`]);
 
   // Insert Default QR Code
-  execute(`
+  await execute(`
     INSERT INTO qr_codes (id, restaurant_id, menu_id, identifier, label, table_number, status)
     VALUES (?, ?, ?, ?, ?, '', 'ACTIVE')
   `, [`QR_${newId}`, newId, menuId, newId, `General Table QR — ${name}`]);
 
   // Link Owner
-  execute(`
+  await execute(`
     INSERT INTO restaurant_users (id, restaurant_id, user_id, role)
     VALUES (?, ?, ?, 'OWNER')
   `, [`RU_${newId}_${req.user.id}`, newId, req.user.id]);
 
-  const created = queryOne('SELECT * FROM restaurants WHERE id = ?', [newId]);
+  const created = await queryOne('SELECT * FROM restaurants WHERE id = ?', [newId]);
 
   res.status(201).json({
     success: true,
@@ -132,9 +133,9 @@ router.post('/', requireAuth, requireRole('SUPER_ADMIN'), (req, res) => {
 });
 
 // PUT /api/restaurants/:id
-router.put('/:id', requireAuth, enforceTenantAccess, (req, res) => {
+router.put('/:id', requireAuth, enforceTenantAccess, async (req, res) => {
   const id = req.params.id;
-  const existing = queryOne('SELECT * FROM restaurants WHERE id = ?', [id]);
+  const existing = await queryOne('SELECT * FROM restaurants WHERE id = ?', [id]);
   if (!existing) {
     return res.status(404).json({ success: false, error: 'Restaurant not found.' });
   }
@@ -158,12 +159,12 @@ router.put('/:id', requireAuth, enforceTenantAccess, (req, res) => {
   if (name !== existing.name) {
     slug = slugify(name);
     let sCount = 1;
-    while (queryOne('SELECT id FROM restaurants WHERE slug = ? AND id != ?', [slug, id])) {
+    while (await queryOne('SELECT id FROM restaurants WHERE slug = ? AND id != ?', [slug, id])) {
       slug = `${slugify(name)}-${++sCount}`;
     }
   }
 
-  execute(`
+  await execute(`
     UPDATE restaurants SET
       name = ?, slug = ?, tagline = ?, cuisine = ?, theme_color = ?, accent_color = ?,
       logo_emoji = ?, logo_url = ?, address = ?, phone = ?, open_time = ?, close_time = ?,
@@ -171,14 +172,14 @@ router.put('/:id', requireAuth, enforceTenantAccess, (req, res) => {
     WHERE id = ?
   `, [name, slug, tagline, cuisine, themeColor, accentColor, logoEmoji, logoUrl, address, phone, openTime, closeTime, status, id]);
 
-  const updated = queryOne('SELECT * FROM restaurants WHERE id = ?', [id]);
+  const updated = await queryOne('SELECT * FROM restaurants WHERE id = ?', [id]);
   res.json({ success: true, restaurant: updated });
 });
 
 // DELETE /api/restaurants/:id (SUPER_ADMIN ONLY)
-router.delete('/:id', requireAuth, requireRole('SUPER_ADMIN'), (req, res) => {
+router.delete('/:id', requireAuth, requireRole('SUPER_ADMIN'), async (req, res) => {
   const id = req.params.id;
-  execute('DELETE FROM restaurants WHERE id = ?', [id]);
+  await execute('DELETE FROM restaurants WHERE id = ?', [id]);
   res.json({ success: true, message: `Restaurant ${id} deleted successfully.` });
 });
 

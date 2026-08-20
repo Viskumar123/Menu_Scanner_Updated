@@ -1,13 +1,13 @@
 /**
  * server/db/seed.js — Master Database Seeder.
- * Parses data/restaurants.csv, creates default users, and populates SQLite database.
+ * Parses data/restaurants.csv, creates default users, and populates the Turso database.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 const Papa = require('papaparse');
 const bcrypt = require('bcryptjs');
-const { getDB, queryOne, queryAll, execute } = require('./index');
+const { getDB, queryOne, queryAll, execute, execScript } = require('./index');
 
 function slugify(text) {
   return text
@@ -21,10 +21,18 @@ function slugify(text) {
 
 async function seedDatabase(force = false) {
   console.log('[MenuScan DB] Starting database seeding...');
-  const db = getDB();
+
+  // Initialize schema first
+  const schemaPath = path.join(__dirname, 'schema.sql');
+  if (fs.existsSync(schemaPath)) {
+    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+    await execScript(schemaSql);
+    console.log('[MenuScan DB] Schema initialized.');
+  }
 
   // Check if restaurants already exist
-  const existingCount = queryOne('SELECT COUNT(*) as cnt FROM restaurants')?.cnt || 0;
+  const countRow = await queryOne('SELECT COUNT(*) as cnt FROM restaurants');
+  const existingCount = countRow?.cnt || 0;
   if (existingCount > 0 && !force) {
     console.log(`[MenuScan DB] Database already contains ${existingCount} restaurants. Skipping seed.`);
     return true;
@@ -38,19 +46,19 @@ async function seedDatabase(force = false) {
 
   // Clear existing if force
   if (force) {
-    execute('DELETE FROM analytics_events');
-    execute('DELETE FROM orders');
-    execute('DELETE FROM qr_codes');
-    execute('DELETE FROM menu_items');
-    execute('DELETE FROM categories');
-    execute('DELETE FROM menus');
-    execute('DELETE FROM restaurant_users');
-    execute('DELETE FROM restaurants');
-    execute('DELETE FROM users');
+    await execute('DELETE FROM analytics_events');
+    await execute('DELETE FROM orders');
+    await execute('DELETE FROM qr_codes');
+    await execute('DELETE FROM menu_items');
+    await execute('DELETE FROM categories');
+    await execute('DELETE FROM menus');
+    await execute('DELETE FROM restaurant_users');
+    await execute('DELETE FROM restaurants');
+    await execute('DELETE FROM users');
   }
 
   // Insert Super Admin
-  execute(`
+  await execute(`
     INSERT OR REPLACE INTO users (id, name, email, password_hash, role, status)
     VALUES (?, ?, ?, ?, ?, ?)
   `, ['USR_ADMIN', 'Platform Administrator', 'admin@menuscan.com', adminPassHash, 'SUPER_ADMIN', 'ACTIVE']);
@@ -63,12 +71,12 @@ async function seedDatabase(force = false) {
     { id: 'USR_OWNER_4', name: 'Burger Barn Manager', email: 'owner4@menuscan.com', restId: 'R004' }
   ];
 
-  ownerAccounts.forEach(oa => {
-    execute(`
+  for (const oa of ownerAccounts) {
+    await execute(`
       INSERT OR REPLACE INTO users (id, name, email, password_hash, role, status)
       VALUES (?, ?, ?, ?, ?, ?)
     `, [oa.id, oa.name, oa.email, ownerPassHash, 'RESTAURANT_OWNER', 'ACTIVE']);
-  });
+  }
 
   // 2. Parse CSV
   const csvPath = path.join(__dirname, '../../data/restaurants.csv');
@@ -119,7 +127,7 @@ async function seedDatabase(force = false) {
 
   // Insert Restaurants, Menus, QR Codes, and map Owner users
   for (const [rid, rest] of restaurantMap.entries()) {
-    execute(`
+    await execute(`
       INSERT OR REPLACE INTO restaurants (
         id, name, slug, tagline, theme_color, accent_color, logo_url, logo_emoji,
         cuisine, rating, address, phone, open_time, close_time, status
@@ -131,13 +139,13 @@ async function seedDatabase(force = false) {
     ]);
 
     // Insert published Main Menu
-    execute(`
+    await execute(`
       INSERT OR REPLACE INTO menus (id, restaurant_id, name, description, status, version)
       VALUES (?, ?, ?, ?, ?, ?)
     `, [rest.menuId, rest.id, 'Main Menu', `Official digital menu for ${rest.name}`, 'PUBLISHED', 1]);
 
     // Insert Default Table QR Code
-    execute(`
+    await execute(`
       INSERT OR REPLACE INTO qr_codes (id, restaurant_id, menu_id, identifier, label, table_number, status)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [`QR_${rest.id}`, rest.id, rest.menuId, rest.id, `General Table QR — ${rest.name}`, '', 'ACTIVE']);
@@ -145,7 +153,7 @@ async function seedDatabase(force = false) {
     // Link assigned owner user if matching
     const assignedOwner = ownerAccounts.find(oa => oa.restId === rest.id);
     if (assignedOwner) {
-      execute(`
+      await execute(`
         INSERT OR REPLACE INTO restaurant_users (id, restaurant_id, user_id, role)
         VALUES (?, ?, ?, ?)
       `, [`RU_${rest.id}_${assignedOwner.id}`, rest.id, assignedOwner.id, 'OWNER']);
@@ -154,7 +162,8 @@ async function seedDatabase(force = false) {
 
   // Second pass: Insert Categories and Menu Items
   let catIndex = 1;
-  rows.forEach((r, idx) => {
+  for (let idx = 0; idx < rows.length; idx++) {
+    const r = rows[idx];
     const rid = r.restaurant_id;
     const catName = r.category || 'Main Course';
     const catKey = `${rid}_${catName}`;
@@ -165,7 +174,7 @@ async function seedDatabase(force = false) {
       categoryMap.set(catKey, catId);
 
       const menuId = restaurantMap.get(rid)?.menuId || `MENU_${rid}`;
-      execute(`
+      await execute(`
         INSERT OR REPLACE INTO categories (id, menu_id, name, description, display_order, status)
         VALUES (?, ?, ?, ?, ?, ?)
       `, [catId, menuId, catName, `${catName} selections`, catIndex, 'ACTIVE']);
@@ -176,7 +185,7 @@ async function seedDatabase(force = false) {
     const isAvail = r.is_available === 'false' || r.is_available === false || r.is_available === '0' ? 0 : 1;
     const isBs = r.is_bestseller === 'true' || r.is_bestseller === true || r.is_bestseller === '1' ? 1 : 0;
 
-    execute(`
+    await execute(`
       INSERT OR REPLACE INTO menu_items (
         id, category_id, restaurant_id, name, description, price, currency,
         image_url, image_alt_text, emoji, is_vegetarian, is_available, is_bestseller,
@@ -187,7 +196,7 @@ async function seedDatabase(force = false) {
       r.currency || '₹', r.image_url || '', `${r.item_name} culinary presentation`,
       r.item_emoji || '🍽️', isVeg, isAvail, isBs, r.spice_level || 'None', idx + 1, 'ACTIVE'
     ]);
-  });
+  }
 
   console.log(`[MenuScan DB] Seeding completed successfully!`);
   console.log(`[MenuScan DB] Initialized ${restaurantMap.size} restaurants, ${categoryMap.size} categories, and ${rows.length} dishes.`);

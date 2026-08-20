@@ -6,7 +6,7 @@
 
 const { queryOne } = require('../db');
 
-function enforceTenantAccess(req, res, next) {
+async function enforceTenantAccess(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ success: false, error: 'Authentication required.' });
   }
@@ -32,7 +32,7 @@ function enforceTenantAccess(req, res, next) {
   }
 
   // Check mapping in restaurant_users
-  const mapping = queryOne(`
+  const mapping = await queryOne(`
     SELECT * FROM restaurant_users
     WHERE restaurant_id = ? AND user_id = ?
   `, [targetRestaurantId, req.user.id]);
